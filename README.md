@@ -38,6 +38,16 @@ Every folder except `public/` has an `.htaccess` with `Require all denied`, as a
 
 Open the site. The landing page shows "Daftar Sekarang".
 
+## Static preview on GitHub Pages (draft)
+
+`docs/` holds a static copy of the portal for previewing before the Plesk deployment: landing page, registration form (client-side checks only), module viewer, Kuiz Akhir and a certificate PDF generated in the browser. It is plain HTML, CSS and JavaScript with no backend. Nothing is sent to a server; progress is kept in the browser's localStorage, and every page shows "Draf / pratonton — data tidak disimpan". The quiz answers are visible in `docs/assets/js/app.js`, so use it for preview only.
+
+To publish it: on GitHub open the repository → Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: **main**, folder **/docs** → Save. After a minute the preview is at `https://raimi-akasyah.github.io/nadi/`.
+
+To try it locally: `& 'C:\xampp 8.2\php\php.exe' -S 127.0.0.1:8090 -t docs`, then open http://127.0.0.1:8090.
+
+The slide text and quiz questions in `docs/assets/js/app.js` are copied from `content/course.php` and `content/quiz.php`. Update both when the content changes.
+
 ## Editing the content
 
 - **Slides and modules:** edit `content/course.php`. Each section has lessons, and each presentation lesson has `slides` of `['title' => ..., 'body' => ...]`. A slide can show an image instead by adding `'image' => 'assets/slides/name.png'` and uploading the file to `public/assets/slides/`. Keep the lesson `key` values unchanged once learners have started, because progress is stored by key.
