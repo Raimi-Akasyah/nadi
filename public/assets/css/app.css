@@ -199,3 +199,22 @@ h1, h2, h3 { line-height: 1.25; }
   .complete-form .btn { width: 100%; }
   .topbar-user { display: none; }
 }
+
+/* Quiz, certificate and verification */
+.alert-success { background: #e7f6ec; color: #1e6b3a; }
+.alert p { margin: 0 0 6px; }
+.alert p:last-child { margin-bottom: 0; }
+.quiz-form { max-width: 820px; }
+.quiz-question { border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; margin: 0 0 16px; }
+.quiz-question legend { font-weight: 600; padding: 0 6px; }
+.quiz-option { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; cursor: pointer; }
+.quiz-option input { margin-top: 4px; }
+.quiz-result { max-width: 820px; }
+.quiz-score { font-size: 1.25rem; font-weight: 600; margin-top: 0; }
+.quiz-status { font-size: 1.6rem; font-weight: 700; letter-spacing: 1px; }
+.quiz-result.is-pass .quiz-status { color: var(--success); }
+.quiz-result.is-fail .quiz-status { color: var(--danger); }
+.certificate-details { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 20px 0; }
+.certificate-details dt { font-weight: 600; color: var(--muted); }
+.certificate-details dd { margin: 0; }
+.verify-result { margin-top: 20px; }

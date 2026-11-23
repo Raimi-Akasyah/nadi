@@ -7,6 +7,10 @@
 /** @var int $slideCount */
 /** @var int $percent */
 /** @var array $missing */
+/** @var array|null $quiz */
+/** @var array|null $attempt */
+/** @var int $attemptNo */
+/** @var array|null $completion */
 
 $lessonUrl = static function (string $key, ?int $slideNo = null): string {
     $q = ['lesson' => $key];
@@ -134,9 +138,50 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                     </ul>
                 </div>
             <?php else: ?>
-                <div class="card quiz-placeholder">
-                    <p>Semua modul telah selesai. Kuiz Akhir akan dipaparkan di sini.</p>
-                </div>
+                <?php if ($completion !== null): ?>
+                    <div class="alert alert-success">
+                        Kursus ini telah selesai. <a href="certificate.php">Lihat sijil anda</a>.
+                    </div>
+                <?php endif; ?>
+
+                <?php if ($attempt !== null):
+                    $passed = (int)$attempt['passed'] === 1;
+                    $pct = rtrim(rtrim(number_format((float)$attempt['score_percent'], 2, '.', ''), '0'), '.');
+                ?>
+                    <div class="card quiz-result <?= $passed ? 'is-pass' : 'is-fail' ?>">
+                        <p class="quiz-score">Markah anda: <?= e($attempt['correct_count']) ?>/<?= e($attempt['total_questions']) ?> (<?= e($pct) ?>%)</p>
+                        <p class="quiz-status"><?= $passed ? 'LULUS' : 'GAGAL' ?></p>
+                        <?php if (!$passed): ?>
+                            <p>Markah lulus ialah <?= e($quiz['pass_mark']) ?>%. Anda boleh mencuba lagi tanpa had.</p>
+                            <a class="btn btn-primary" href="<?= e($lessonUrl($lesson['key'])) ?>">Cuba Lagi</a>
+                        <?php elseif ($completion === null): ?>
+                            <p>Tahniah! Tekan butang di bawah untuk menghantar penyelesaian kursus dan mendapatkan sijil anda.</p>
+                            <form method="post" action="complete.php">
+                                <?= csrf_field() ?>
+                                <button type="submit" class="btn btn-primary">LENGKAP &amp; TERUSKAN</button>
+                            </form>
+                        <?php else: ?>
+                            <a class="btn btn-primary" href="certificate.php">Lihat Sijil</a>
+                        <?php endif; ?>
+                    </div>
+                <?php else: ?>
+                    <form method="post" action="quiz-submit.php" class="card quiz-form">
+                        <?= csrf_field() ?>
+                        <p class="muted">Markah lulus: <?= e($quiz['pass_mark']) ?>% &middot; Percubaan ke-<?= e($attemptNo) ?></p>
+                        <?php foreach ($quiz['questions'] as $qi => $q): ?>
+                            <fieldset class="quiz-question">
+                                <legend><?= e($qi + 1) ?>. <?= e($q['text']) ?></legend>
+                                <?php foreach ($q['options'] as $optKey => $optText): ?>
+                                    <label class="quiz-option">
+                                        <input type="radio" name="answers[<?= e($q['id']) ?>]" value="<?= e($optKey) ?>" required>
+                                        <span><?= e($optText) ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </fieldset>
+                        <?php endforeach; ?>
+                        <button type="submit" class="btn btn-primary">Hantar Jawapan</button>
+                    </form>
+                <?php endif; ?>
             <?php endif; ?>
         <?php endif; ?>
     </main>

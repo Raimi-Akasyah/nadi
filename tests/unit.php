@@ -89,5 +89,46 @@ foreach ($cases as $label => [$override, $field]) {
 [, $errs] = validate_registration([]);
 check(count($errs) === 7, 'validate_registration: empty input -> 7 errors');
 
+// --- grade_quiz ---
+$answersWith = static function (array $quiz, int $correct): array {
+    $out = [];
+    foreach ($quiz['questions'] as $i => $q) {
+        if ($i < $correct) {
+            $out[$q['id']] = $q['answer'];
+        } else {
+            $wrong = array_values(array_diff(array_keys($q['options']), [$q['answer']]));
+            $out[$q['id']] = $wrong[0];
+        }
+    }
+    return $out;
+};
+$r = grade_quiz($quiz, $answersWith($quiz, 7));
+check($r['correct'] === 7 && $r['total'] === 10 && $r['percent'] === 70.0 && $r['passed'] === false, 'grade_quiz: 7/10 -> 70% and fails');
+$r = grade_quiz($quiz, $answersWith($quiz, 8));
+check($r['correct'] === 8 && $r['percent'] === 80.0 && $r['passed'] === true, 'grade_quiz: 8/10 -> 80% and passes');
+$r = grade_quiz($quiz, $answersWith($quiz, 10));
+check($r['percent'] === 100.0 && $r['passed'] === true, 'grade_quiz: 10/10 -> 100%');
+$small = ['pass_mark' => 75, 'questions' => array_slice($quiz['questions'], 0, 4)];
+$r = grade_quiz($small, $answersWith($small, 3));
+check($r['total'] === 4 && $r['percent'] === 75.0 && $r['passed'] === true, 'grade_quiz: 3/4 -> 75% passes (boundary)');
+$r = grade_quiz($quiz, []);
+check($r['correct'] === 0 && $r['percent'] === 0.0 && $r['passed'] === false && $r['answers'] === [], 'grade_quiz: empty answers -> 0');
+$q1 = $quiz['questions'][0];
+$r = grade_quiz($quiz, ['zz' => 'a', $q1['id'] => 'x', $quiz['questions'][1]['id'] => ['a']]);
+check($r['correct'] === 0 && $r['answers'] === [], 'grade_quiz: unknown qid, unknown option and non-string ignored');
+$r = grade_quiz($quiz, [$q1['id'] => $q1['answer'], 'zz' => 'a']);
+check($r['correct'] === 1 && $r['answers'] === [$q1['id'] => $q1['answer']], 'grade_quiz: sanitized answers keep only known qids');
+
+// --- certificate PDF ---
+$pdf = render_certificate_pdf([
+    'first_name' => 'Ali', 'last_name' => 'Ahmad', 'course_title' => $course->title(),
+    'date_text' => format_date_ms('2026-11-23 10:00:00'), 'code' => 'NADI-0123456789', 'issuer' => 'NADI',
+]);
+check(strncmp($pdf, '%PDF', 4) === 0, 'certificate PDF starts with %PDF');
+check(strpos($pdf, 'Ali Ahmad') !== false, "certificate PDF contains 'Ali Ahmad'");
+check(strpos($pdf, '23 November 2026') !== false, "certificate PDF contains '23 November 2026'");
+check(strpos($pdf, 'NADI-0123456789') !== false, 'certificate PDF contains the code');
+check(pdf_text('Caf' . "\u{00E9}") === "Caf\xE9", 'pdf_text converts UTF-8 to windows-1252');
+
 echo $failures === 0 ? "\nAll tests passed.\n" : "\n$failures test(s) failed.\n";
 exit($failures === 0 ? 0 : 1);

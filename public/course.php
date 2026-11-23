@@ -51,6 +51,24 @@ if ($lesson['type'] === 'quiz') {
     }
 }
 
+$quiz = null;
+$attempt = null;
+$attemptNo = 0;
+$completion = null;
+if ($lesson['type'] === 'quiz' && $missing === []) {
+    $quiz = $course->quiz();
+    $learnerId = (int)$learner['id'];
+    $completion = completion_find($learnerId, $course->key());
+    $attemptNo = attempt_count($learnerId, $course->key()) + 1;
+    $attemptId = filter_var($_GET['attempt'] ?? null, FILTER_VALIDATE_INT);
+    if ($attemptId !== false && $attemptId !== null) {
+        $attempt = attempt_find((int)$attemptId, $learnerId);
+        if ($attempt === null) {
+            abort(404, 'Percubaan kuiz tidak dijumpai.');
+        }
+    }
+}
+
 render('course', [
     'title'      => $lesson['title'],
     'bodyClass'  => 'course-page',
@@ -64,4 +82,8 @@ render('course', [
     'slideCount' => $slideCount,
     'percent'    => $percent,
     'missing'    => $missing,
+    'quiz'       => $quiz,
+    'attempt'    => $attempt,
+    'attemptNo'  => $attemptNo,
+    'completion' => $completion,
 ]);

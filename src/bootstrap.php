@@ -86,3 +86,5 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/repositories.php';
 require_once __DIR__ . '/Course.php';
+require_once __DIR__ . '/Quiz.php';
+require_once __DIR__ . '/CertificatePdf.php';
