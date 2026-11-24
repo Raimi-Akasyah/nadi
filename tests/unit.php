@@ -156,6 +156,16 @@ check(strncmp($pdf, '%PDF', 4) === 0, 'certificate PDF starts with %PDF');
 check(strpos($pdf, 'Ali Ahmad') !== false, "certificate PDF contains 'Ali Ahmad'");
 check(strpos($pdf, '23 November 2026') !== false, "certificate PDF contains '23 November 2026'");
 check(strpos($pdf, 'NADI-0123456789') !== false, 'certificate PDF contains the code');
+check(strpos($pdf, 'SIJIL PENYERTAAN') !== false, "certificate PDF contains 'SIJIL PENYERTAAN'");
+check(strpos($pdf, 'AI FOR COMMUNITY@NADI') !== false, "certificate PDF contains 'AI FOR COMMUNITY@NADI'");
+check(strpos($pdf, 'Thanaselan Rajendran') !== false, 'certificate PDF contains the signatory name');
+check(substr_count($pdf, '/Subtype /Image') >= 3, 'certificate PDF embeds background, logos and badge images');
+$longLast = str_repeat('Abcdefghij', 6);
+$pdf = render_certificate_pdf([
+    'first_name' => 'Ali', 'last_name' => $longLast, 'course_title' => $course->title(),
+    'date_text' => format_date_ms('2026-11-23 10:00:00'), 'code' => 'NADI-0123456789', 'issuer' => 'NADI',
+]);
+check(strpos($pdf, 'Ali ' . $longLast) !== false, 'certificate PDF contains a 60-character last name in full');
 check(pdf_text('Caf' . "\u{00E9}") === "Caf\xE9", 'pdf_text converts UTF-8 to windows-1252');
 
 // --- Sambung Semula: e-mail validation and rate limit ---

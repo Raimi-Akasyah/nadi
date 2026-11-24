@@ -114,7 +114,28 @@
     ]
   };
 
-  var ISSUER = 'NADI';
+  var ISSUER = 'NADI'; // PDF author only
+
+  // Certificate wording and images. Keep in sync with content/certificate.php
+  // (images are copies of public/assets/certificate/).
+  var CERT = {
+    background: 'assets/certificate/background.png',
+    logos: 'assets/certificate/logos.png',
+    badge: 'assets/certificate/badge.png',
+    title: 'SIJIL PENYERTAAN',
+    intro: 'Dengan ini disahkan bahawa',
+    completed: 'telah berjaya untuk menamatkan program',
+    program: 'AI FOR COMMUNITY@NADI',
+    focus: 'Program yang menfokuskan kepada literasi AI, produktiviti dan penggunaan AI yang bertanggungjawab',
+    summary: ['Kursus ini merangkumi ', '3 jam', ' pembelajaran intensif bagi modul-modul berikut:'],
+    modules: [
+      '1. Kesedaran AI   2. Asas AI   3. Kemahiran AI Praktikal (Kejuruteraan Prompt)',
+      '4. AI untuk Perniagaan Mikro & Produktiviti   5. AI Bertanggungjawab dan Kesediaan Masa Hadapan'
+    ],
+    signatory: { name: 'Thanaselan Rajendran', title: 'Managing Director', org: 'Pepper Labs Sdn Bhd' },
+    date_label: 'Tarikh',
+    code_label: 'No. Sijil'
+  };
   var MONTHS = ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'];
 
   // ---- Course helpers ----
@@ -711,64 +732,117 @@
         code: c.code,
         issuer: ISSUER
       };
-      var blob = certificatePdf(data);
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a');
-      a.href = url;
-      a.download = 'sijil-' + c.code + '.pdf';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      certificatePdf(data).then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'sijil-' + c.code + '.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+      });
+    });
+  }
+
+  // Load one image; resolves with the loaded <img>.
+  function loadImage(src) {
+    return new Promise(function (resolve, reject) {
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { reject(new Error('Cannot load ' + src)); };
+      img.src = src;
     });
   }
 
   // Draw the certificate on a canvas, using the same layout (in mm) as src/CertificatePdf.php.
+  // Returns a Promise that resolves with the canvas once the images are drawn.
   function drawCertificate(d) {
-    var W = 297, H = 210, S = 8; // A4 landscape, 8 px per mm
-    var canvas = document.createElement('canvas');
-    canvas.width = W * S;
-    canvas.height = H * S;
-    var g = canvas.getContext('2d');
-    var PT = 25.4 / 72; // mm per point
-    g.fillStyle = '#ffffff';
-    g.fillRect(0, 0, canvas.width, canvas.height);
-    g.strokeStyle = 'rgb(31,78,140)';
-    g.lineWidth = 1.5 * S;
-    g.strokeRect(10 * S, 10 * S, (W - 20) * S, (H - 20) * S);
-    g.lineWidth = 0.5 * S;
-    g.strokeRect(14 * S, 14 * S, (W - 28) * S, (H - 28) * S);
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    function cell(y, h, text, family, weight, sizePt, color) {
-      g.fillStyle = color;
-      g.font = weight + ' ' + (sizePt * PT * S) + 'px ' + family;
-      g.fillText(text, (W / 2) * S, (y + h / 2) * S, (W - 40) * S);
-    }
-    var sans = 'Helvetica, Arial, sans-serif';
-    var serif = '"Times New Roman", Times, serif';
-    var ink = 'rgb(29,36,51)';
-    cell(26, 10, d.issuer, sans, 'bold', 22, 'rgb(31,78,140)');
-    cell(48, 14, 'SIJIL PENYELESAIAN', sans, 'bold', 30, ink);
-    cell(72, 8, 'Dengan ini disahkan bahawa', sans, 'normal', 14, ink);
-    cell(86, 16, d.first_name + ' ' + d.last_name, serif, 'bold', 32, ink);
-    g.strokeStyle = 'rgb(180,180,180)';
-    g.lineWidth = 0.3 * S;
-    g.beginPath();
-    g.moveTo((W / 2 - 70) * S, 104 * S);
-    g.lineTo((W / 2 + 70) * S, 104 * S);
-    g.stroke();
-    cell(112, 8, 'telah berjaya menamatkan kursus', sans, 'normal', 14, ink);
-    cell(124, 12, d.course_title, sans, 'bold', 20, ink);
-    cell(156, 7, 'Tarikh: ' + d.date_text, sans, 'normal', 12, ink);
-    cell(164, 7, 'No. Sijil: ' + d.code, sans, 'normal', 12, ink);
-    cell(186, 6, 'DRAF / PRATONTON', sans, 'normal', 9, 'rgb(150,150,150)');
-    return canvas;
+    return Promise.all([loadImage(CERT.background), loadImage(CERT.logos), loadImage(CERT.badge)]).then(function (imgs) {
+      var W = 297, H = 210, S = 8; // A4 landscape, 8 px per mm
+      var canvas = document.createElement('canvas');
+      canvas.width = W * S;
+      canvas.height = H * S;
+      var g = canvas.getContext('2d');
+      var PT = 25.4 / 72; // mm per point
+      var sans = 'Helvetica, Arial, sans-serif';
+      var ink = 'rgb(17,17,17)';
+      var blue = 'rgb(16,62,110)';
+      g.fillStyle = '#ffffff';
+      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.drawImage(imgs[0], 0, 0, W * S, H * S);
+      var logoW = 18 * imgs[1].naturalWidth / imgs[1].naturalHeight;
+      g.drawImage(imgs[1], ((W - logoW) / 2) * S, 9 * S, logoW * S, 18 * S);
+
+      g.textBaseline = 'middle';
+      function font(weight, sizePt) {
+        g.font = weight + ' ' + (sizePt * PT * S) + 'px ' + sans;
+      }
+      // One line of text: centred on the page, or left-aligned at x (mm) when x is given.
+      function cell(y, h, text, weight, sizePt, color, x) {
+        g.fillStyle = color;
+        font(weight, sizePt);
+        g.textAlign = x === undefined ? 'center' : 'left';
+        g.fillText(text, (x === undefined ? W / 2 : x) * S, (y + h / 2) * S);
+      }
+
+      cell(34, 14, CERT.title, 'bold', 34, ink);
+      cell(54, 6, CERT.intro, 'normal', 12, ink);
+      var name = d.first_name + ' ' + d.last_name;
+      var size = 26;
+      font('bold', size);
+      while (size > 14 && g.measureText(name).width > 240 * S) {
+        size--;
+        font('bold', size);
+      }
+      cell(62, 12, name, 'bold', size, blue);
+      cell(88, 6, CERT.completed, 'normal', 12, ink);
+      cell(96, 9, CERT.program, 'bold', 18, blue);
+      cell(114, 6, CERT.focus, 'bold', 11, ink);
+
+      // Summary line: normal, bold, normal pieces measured and drawn side by side.
+      var weights = ['normal', 'bold', 'normal'];
+      var widths = CERT.summary.map(function (part, i) {
+        font(weights[i % 3], 10.5);
+        return g.measureText(part).width / S;
+      });
+      var x = (W - widths.reduce(function (s, v) { return s + v; }, 0)) / 2;
+      CERT.summary.forEach(function (part, i) {
+        cell(122, 5, part, weights[i % 3], 10.5, ink, x);
+        x += widths[i];
+      });
+      CERT.modules.forEach(function (line, i) {
+        cell(128 + 6 * i, 5, line, 'normal', 10.5, ink);
+      });
+
+      // Signature.
+      g.strokeStyle = ink;
+      g.lineWidth = 0.3 * S;
+      g.beginPath();
+      g.moveTo(116 * S, 178 * S);
+      g.lineTo(181 * S, 178 * S);
+      g.stroke();
+      cell(180, 5, CERT.signatory.name, 'bold', 10, ink);
+      cell(185, 5, CERT.signatory.title, 'normal', 10, ink);
+      cell(190, 5, CERT.signatory.org, 'normal', 10, ink);
+
+      var badgeH = 28 * imgs[2].naturalHeight / imgs[2].naturalWidth;
+      g.drawImage(imgs[2], 212 * S, 152 * S, 28 * S, badgeH * S);
+
+      cell(186, 5, CERT.date_label + ': ' + d.date_text, 'normal', 9, ink, 18);
+      cell(191, 5, CERT.code_label + ': ' + d.code, 'normal', 9, ink, 18);
+      cell(199.5, 5, 'DRAF / PRATONTON', 'normal', 9, 'rgb(150,150,150)');
+      return canvas;
+    });
+  }
+
+  // Build the certificate PDF. Returns a Promise that resolves with a Blob.
+  function certificatePdf(d) {
+    return drawCertificate(d).then(function (canvas) { return canvasPdf(canvas, d); });
   }
 
   // Wrap the canvas as a JPEG image in a one-page PDF (A4 landscape).
-  function certificatePdf(d) {
-    var canvas = drawCertificate(d);
+  function canvasPdf(canvas, d) {
     var b64 = canvas.toDataURL('image/jpeg', 0.92).split(',')[1];
     var bin = atob(b64);
     var jpeg = new Uint8Array(bin.length);
