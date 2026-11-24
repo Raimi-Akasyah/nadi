@@ -2,46 +2,87 @@
  * NADI LMS static preview (GitHub Pages draft).
  * Mirrors the PHP portal's flow with no backend: state lives in the browser only
  * (sessionStorage, or localStorage when "Ingat saya" is ticked).
- * Content below is copied from content/course.php and content/quiz.php.
+ * Content below is copied from content/course.php and content/quiz.php; slide images
+ * are copies of public/assets/slides/ in docs/assets/slides/ (relative paths, so /nadi/ works).
  */
 (function () {
   'use strict';
 
   // ---- Content (keep in sync with content/course.php and content/quiz.php) ----
-  function placeholderSlides(topic, count) {
-    var slides = [];
-    for (var i = 1; i <= count; i++) {
-      slides.push({
-        title: topic + ' - Slaid ' + i,
-        body: 'Kandungan contoh untuk slaid ' + i + ' bagi topik "' + topic + '". ' +
-          'Gantikan teks ini dengan kandungan sebenar modul.'
-      });
-    }
-    return slides;
-  }
-  function pres(key, title, topic, count) {
-    return { key: key, title: title, type: 'presentation', slides: placeholderSlides(topic, count) };
-  }
-
   var COURSE = {
     key: 'ai-essentials',
     title: 'Malaysia AWS AI Essentials',
     quizRequires: ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'],
     sections: [
-      { key: 'pre-survey', title: 'Pre-Survey', lessons: [pres('pre-survey', 'Pre-Survey', 'Pre-Survey', 1)] },
-      { key: 'modul-1', title: 'Modul 1: Kesedaran AI & Keyakinan Digital',
-        lessons: [pres('modul-1-pengenalan', 'Pengenalan AI', 'Pengenalan AI', 5)] },
-      { key: 'modul-2', title: 'Modul 2: Asas AI',
-        lessons: [pres('modul-2-pengenalan', 'Asas AI', 'Asas AI', 5)] },
-      { key: 'modul-3', title: 'Modul 3: Kemahiran Praktikal AI',
-        lessons: [pres('modul-3-pengenalan', 'Kemahiran Praktikal AI', 'Kemahiran Praktikal AI', 5)] },
-      { key: 'modul-4', title: 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti',
-        lessons: [pres('modul-4-pengenalan', 'AI untuk Perniagaan Mikro', 'AI untuk Perniagaan Mikro', 5)] },
-      { key: 'modul-5', title: 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan',
-        lessons: [pres('modul-5-pengenalan', 'AI Bertanggungjawab', 'AI Bertanggungjawab', 5)] },
-      { key: 'kuiz-akhir', title: 'Kuiz Akhir', lessons: [{ key: 'kuiz-akhir', title: 'Kuiz Akhir', type: 'quiz' }] },
-      { key: 'post-survey', title: 'Post-Survey', lessons: [pres('post-survey', 'Post-Survey', 'Post-Survey', 1)] },
-      { key: 'bonus', title: 'Bonus Konten!', lessons: [pres('bonus-konten', 'Bonus Konten!', 'Bonus Konten', 2)] }
+      { key: 'pengenalan', title: 'Pengenalan', lessons: [
+        { key: 'pengenalan', title: 'Pengenalan', type: 'presentation', slides: [
+          { title: 'AI Untuk Komuniti', image: 'assets/slides/page-01.webp' },
+          { title: 'Rakan Strategik Program: AWS', image: 'assets/slides/page-07.webp' }
+        ] }
+      ] },
+      { key: 'modul-1', title: 'Modul 1: Kesedaran AI & Keyakinan Digital', lessons: [
+        { key: 'modul-1-pengenalan', title: 'Pengenalan AI', type: 'presentation', slides: [
+          { title: 'Modul 1: Kesedaran AI & Keyakinan Digital', image: 'assets/slides/page-08.webp' },
+          { title: 'Apakah Itu Kecerdasan Buatan (AI)?', image: 'assets/slides/page-09.webp' },
+          { title: 'AI Bukan Pengganti Kita, Tapi Pembantu Kita', image: 'assets/slides/page-10.webp' }
+        ] }
+      ] },
+      { key: 'modul-2', title: 'Modul 2: Asas AI', lessons: [
+        { key: 'modul-2-pengenalan', title: 'Asas AI', type: 'presentation', slides: [
+          { title: 'Modul 2: Asas AI', image: 'assets/slides/page-11.webp' },
+          { title: 'Macam Mana AI Belajar?', image: 'assets/slides/page-12.webp' },
+          { title: 'Apakah Itu AI Generatif?', image: 'assets/slides/page-13.webp' },
+          { title: '\'Perangai\' Pekerja Baru AI Kita', image: 'assets/slides/page-14.webp' }
+        ] }
+      ] },
+      { key: 'modul-3', title: 'Modul 3: Kemahiran Praktikal AI', lessons: [
+        { key: 'modul-3-pengenalan', title: 'Kemahiran Praktikal AI', type: 'presentation', slides: [
+          { title: 'Modul 3: Kemahiran Praktikal AI untuk Pembelajaran & Kerjaya', image: 'assets/slides/page-15.webp' },
+          { title: 'Apa Itu "AI Prompt"?', image: 'assets/slides/page-16.webp' },
+          { title: 'Mengapa Arahan yang Jelas Sangat Penting?', image: 'assets/slides/page-17.webp' },
+          { title: 'Selesaikan Masalah dengan Formula KOPI!', image: 'assets/slides/page-18.webp' },
+          { title: '4 Ramuan Rahsia dalam Secawan KOPI', image: 'assets/slides/page-19.webp' },
+          { title: 'Transformasi Prompt: Pemasaran Tudung Raya', image: 'assets/slides/page-20.webp' },
+          { title: '3 Peranan Utama AI untuk Bisnes Anda', image: 'assets/slides/page-21.webp' },
+          { title: 'Latihan Berkumpulan: Selesaikan Krisis \'Sales Turun\' (bisnes.ai)', image: 'assets/slides/page-22.webp' },
+          { title: 'Latihan Berkumpulan: Selesaikan Krisis \'Sales Turun\' (3 Langkah)', image: 'assets/slides/page-23.webp' }
+        ] }
+      ] },
+      { key: 'modul-4', title: 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti', lessons: [
+        { key: 'modul-4-pengenalan', title: 'AI untuk Perniagaan Mikro', type: 'presentation', slides: [
+          { title: 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti', image: 'assets/slides/page-24.webp' },
+          { title: 'Janji 45 Minit Anda', image: 'assets/slides/page-25.webp' },
+          { title: 'Langkah 1: Jana Idea Perniagaan', image: 'assets/slides/page-26.webp' },
+          { title: 'Langkah 1: Jana Idea Perniagaan (Kanvas Model Perniagaan)', image: 'assets/slides/page-27.webp' },
+          { title: 'Langkah 2: Tulis Copywriting Media Sosial', image: 'assets/slides/page-28.webp' },
+          { title: 'Langkah 2: Tulis Copywriting Media Sosial (Prompt KOPI)', image: 'assets/slides/page-29.webp' },
+          { title: 'Langkah 4: Visual Poster', image: 'assets/slides/page-30.webp' },
+          { title: 'Langkah 4: Visual Poster (Contoh Prompt)', image: 'assets/slides/page-31.webp' },
+          { title: 'Langkah 5: Komunikasi Pelanggan Profesional', image: 'assets/slides/page-32.webp' },
+          { title: 'Langkah 6: Skrip Video Promosi (30 Saat)', image: 'assets/slides/page-33.webp' },
+          { title: 'Langkah 6: Skrip Video Promosi (Prompt KOPI)', image: 'assets/slides/page-34.webp' },
+          { title: 'Jom Hasilkan Aplikasi (PartyRock)', image: 'assets/slides/page-35.webp' }
+        ] }
+      ] },
+      { key: 'modul-5', title: 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan', lessons: [
+        { key: 'modul-5-pengenalan', title: 'AI Bertanggungjawab', type: 'presentation', slides: [
+          { title: 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan', image: 'assets/slides/page-36.webp' },
+          { title: '4 Tanda Amaran: Gunakan S.T.O.P', image: 'assets/slides/page-37.webp' },
+          { title: 'Berhenti. Semak. Sahkan.', image: 'assets/slides/page-38.webp' },
+          { title: 'Jana Pendapatan Tambahan dengan Bantuan AI', image: 'assets/slides/page-39.webp' },
+          { title: 'Apa Maksud \'Kerja Freelance\'?', image: 'assets/slides/page-40.webp' },
+          { title: 'Kenali 4 Alat AI yang Akan Membantu Anda', image: 'assets/slides/page-41.webp' },
+          { title: 'Teruskan Pembelajaran Anda Selepas Bengkel Ini', image: 'assets/slides/page-42.webp' }
+        ] }
+      ] },
+      { key: 'kuiz-akhir', title: 'Kuiz Akhir', lessons: [
+        { key: 'kuiz-akhir', title: 'Kuiz Akhir', type: 'quiz' }
+      ] },
+      { key: 'penutup', title: 'Penutup', lessons: [
+        { key: 'penutup', title: 'Penutup', type: 'presentation', slides: [
+          { title: 'Terima Kasih', image: 'assets/slides/page-45.webp' }
+        ] }
+      ] }
     ]
   };
 
@@ -451,7 +492,10 @@
     var slides = lesson.slides.map(function (s, i) {
       var n = i + 1;
       return '<article class="slide" data-slide="' + n + '"' + (n === slide ? '' : ' hidden') + '>' +
-        '<h2>' + e(s.title) + '</h2><p>' + e(s.body) + '</p></article>';
+        (s.image
+          ? '<img src="' + e(s.image) + '" alt="' + e(s.title) + '"' + (n === slide ? '' : ' loading="lazy"') + '>'
+          : '<h2>' + e(s.title) + '</h2><p>' + e(s.body) + '</p>') +
+        '</article>';
     }).join('');
     return '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
       '<button type="button" class="btn btn-outline" id="fullscreen-btn">Skrin Penuh</button></div>' +

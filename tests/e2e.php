@@ -2,7 +2,7 @@
 declare(strict_types=1);
 
 // End-to-end test against a running server (needs the DB from config/config.php).
-// Run: & 'C:\xampp 8.2\php\php.exe' tests/e2e.php http://127.0.0.1:8080
+// Run: & 'C:\xampp 8.2\php\php.exe' tests/e2e.php http://127.0.0.1:8080 [path-to-save-certificate.pdf]
 
 require __DIR__ . '/../src/bootstrap.php';
 
@@ -240,19 +240,21 @@ try {
     step(3, 'quiz gated before modules complete (gate message, submit 403)', $gateShown && $r['status'] === 403, "submit status {$r['status']}");
 
     // 4. Viewer navigation and lesson completion.
+    $m1 = count($course->lesson('modul-1-pengenalan')['slides']);
     $s1 = http('GET', 'course.php?lesson=modul-1-pengenalan&slide=1');
-    $s5 = http('GET', 'course.php?lesson=modul-1-pengenalan&slide=5');
-    $ok = strpos($s1['body'], '>1/5<') !== false && strpos($s5['body'], '>5/5<') !== false;
+    $sN = http('GET', 'course.php?lesson=modul-1-pengenalan&slide=' . $m1);
+    $ok = strpos($s1['body'], ">1/$m1<") !== false && strpos($sN['body'], ">$m1/$m1<") !== false;
     for ($n = 1; $n <= 5; $n++) {
         $key = "modul-$n-pengenalan";
-        $page = http('GET', 'course.php?lesson=' . $key . '&slide=5');
+        $slides = count($course->lesson($key)['slides']);
+        $page = http('GET', 'course.php?lesson=' . $key . '&slide=' . $slides);
         $r = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($page['body']), 'lesson' => $key]);
         $next = $course->nextLesson($key)['key'];
         if ($r['status'] !== 302 || $r['location'] !== 'course.php?lesson=' . $next) {
             $ok = false;
         }
     }
-    step(4, 'viewer 1/5 -> 5/5 and lesson-complete leads to the next lesson for Modul 1-5', $ok);
+    step(4, "viewer 1/$m1 -> $m1/$m1 and lesson-complete on each module's last slide leads to the next lesson for Modul 1-5", $ok);
 
     // 5. Completion refused before passing.
     $page = http('GET', 'course.php?lesson=kuiz-akhir');
@@ -309,6 +311,9 @@ try {
         && strpos($pdf['body'], "$first $last") !== false && strpos($pdf['body'], $today) !== false
         && $code !== '' && strpos($pdf['body'], $code) !== false,
         "type {$pdf['type']} date $today");
+    if (isset($argv[2]) && $argv[2] !== '') {
+        file_put_contents($argv[2], $pdf['body']);
+    }
 
     // 10. Public verification.
     $v = http('GET', 'verify.php?code=' . rawurlencode(strtolower($code)));

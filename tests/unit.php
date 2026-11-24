@@ -24,7 +24,7 @@ check(format_date_ms('2026-03-05 00:00:00') === '5 Mac 2026', "format_date_ms us
 
 // --- Course structure ---
 $course = Course::load();
-check(count($course->sections()) === 9, 'course has 9 sections');
+check(count($course->sections()) === 8, 'course has 8 sections');
 $quizLessons = array_values(array_filter($course->lessons(), static function ($l) { return $l['type'] === 'quiz'; }));
 check(count($quizLessons) === 1, 'exactly 1 quiz lesson');
 check(($quizLessons[0]['key'] ?? null) === 'kuiz-akhir', 'quiz lesson key is kuiz-akhir');
@@ -36,7 +36,34 @@ check(($course->nextLesson('modul-5-pengenalan')['key'] ?? null) === 'kuiz-akhir
 check($course->prevLesson($course->lessons()[0]['key']) === null, 'prevLesson of first lesson is null');
 check(($course->prevLesson('modul-2-pengenalan')['key'] ?? null) === 'modul-1-pengenalan', "prevLesson('modul-2-pengenalan') is modul-1-pengenalan");
 check($course->lesson('does-not-exist') === null, 'lesson() returns null for unknown key');
-check(count($course->lesson('modul-1-pengenalan')['slides']) === 5, 'modul-1-pengenalan has 5 slides');
+check(count($course->lesson('modul-1-pengenalan')['slides']) === 3, 'modul-1-pengenalan has 3 slides');
+$allLessons = $course->lessons();
+check($allLessons[0]['key'] === 'pengenalan', "first lesson is 'pengenalan'");
+check($allLessons[count($allLessons) - 1]['key'] === 'penutup', "last lesson is 'penutup'");
+check(($course->prevLesson('modul-1-pengenalan')['key'] ?? null) === 'pengenalan', "prevLesson('modul-1-pengenalan') is pengenalan");
+foreach (['pre-survey', 'post-survey', 'bonus-konten'] as $gone) {
+    check($course->lesson($gone) === null, "lesson '$gone' is removed");
+}
+$slidesOk = true;
+foreach ($allLessons as $l) {
+    if ($l['type'] !== 'presentation') {
+        continue;
+    }
+    foreach ($l['slides'] as $s) {
+        $img = (string)($s['image'] ?? '');
+        if ((string)($s['title'] ?? '') === '' || $img === '') {
+            $slidesOk = false;
+            continue;
+        }
+        foreach ([APP_ROOT . '/public/' . $img, APP_ROOT . '/docs/' . $img] as $path) {
+            if (!is_file($path) || filesize($path) >= 400000) {
+                $slidesOk = false;
+                echo "  bad slide image: $path\n";
+            }
+        }
+    }
+}
+check($slidesOk, 'every slide has a title and an image under 400000 bytes in public/ and docs/');
 check(count($course->sectionLessons('modul-1')) === 1, 'sectionLessons(modul-1) has 1 lesson');
 check($course->lessonLabel($course->lesson('modul-1-pengenalan')) === 'PEMBENTANGAN', 'presentation label is PEMBENTANGAN');
 check($course->lessonLabel($course->quizLesson()) === 'KUIZ - 10 SOALAN', 'quiz label is KUIZ - 10 SOALAN');
@@ -61,6 +88,7 @@ foreach ($quiz['questions'] as $q) {
 }
 check($okOptions, 'every question has 4 options a-d');
 check($okAnswers, 'every answer key exists in its options');
+check(array_column($quiz['questions'], 'answer') === ['b', 'c', 'c', 'a', 'b', 'a', 'b', 'b', 'c', 'c'], 'quiz answer key is b,c,c,a,b,a,b,b,c,c');
 
 // --- validate_registration ---
 $valid = [

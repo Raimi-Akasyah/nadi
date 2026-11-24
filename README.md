@@ -46,11 +46,24 @@ To publish it: on GitHub open the repository → Settings → Pages → Build an
 
 To try it locally: `& 'C:\xampp 8.2\php\php.exe' -S 127.0.0.1:8090 -t docs`, then open http://127.0.0.1:8090.
 
-The slide text and quiz questions in `docs/assets/js/app.js` are copied from `content/course.php` and `content/quiz.php`. Update both when the content changes.
+The course structure, slide titles and quiz questions in `docs/assets/js/app.js` are copied from `content/course.php` and `content/quiz.php`, and the slide images in `docs/assets/slides/` are copies of `public/assets/slides/`. Update both when the content changes.
 
 ## Editing the content
 
-- **Slides and modules:** edit `content/course.php`. Each section has lessons, and each presentation lesson has `slides` of `['title' => ..., 'body' => ...]`. A slide can show an image instead by adding `'image' => 'assets/slides/name.png'` and uploading the file to `public/assets/slides/`. Keep the lesson `key` values unchanged once learners have started, because progress is stored by key.
+- **Slides and modules:** edit `content/course.php`. Each section has lessons, and each presentation lesson has `slides` of `['title' => ..., 'image' => 'assets/slides/page-NN.webp']`. The images are pages of the course deck PDF ("NADI _AWS Training Slide Deck"), rendered as 1600x900 WebP and named by PDF page number (`page-01.webp`, `page-07.webp`, ...). They live in `public/assets/slides/`, with identical copies in `docs/assets/slides/` for the static preview. The `title` is the image's alt text. A slide without `image` shows `title` and `body` as text. Keep the lesson `key` values unchanged once learners have started, because progress is stored by key.
+
+  | Section | PDF pages |
+  | --- | --- |
+  | Pengenalan | 1, 7 |
+  | Modul 1: Kesedaran AI & Keyakinan Digital | 8-10 |
+  | Modul 2: Asas AI | 11-14 |
+  | Modul 3: Kemahiran Praktikal AI | 15-23 |
+  | Modul 4: AI untuk Perniagaan Mikro & Produktiviti | 24-35 |
+  | Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan | 36-42 |
+  | Kuiz Akhir | (quiz, no slides) |
+  | Penutup | 45 |
+
+  Pages 2-6, 43 and 44 of the deck are not used.
 - **Quiz questions:** edit `content/quiz.php`. Each question has an `id`, `text`, four `options` (`a` to `d`) and the correct `answer`. Correct answers are never sent to the browser.
 - **Pass mark:** change `pass_mark` in `content/quiz.php` (default 75). A learner passes when `correct * 100 / total >= pass_mark`.
 - **Which modules unlock the quiz:** `quiz_requires` in `content/course.php`.

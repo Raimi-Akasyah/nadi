@@ -101,7 +101,7 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                     ?>
                         <article class="slide" data-slide="<?= e($n) ?>"<?= $n === $slide ? '' : ' hidden' ?>>
                             <?php if (!empty($s['image'])): ?>
-                                <img src="<?= e($s['image']) ?>" alt="<?= e($s['title'] ?? '') ?>">
+                                <img src="<?= e($s['image']) ?>" alt="<?= e($s['title'] ?? '') ?>"<?= $n === $slide ? '' : ' loading="lazy"' ?>>
                             <?php else: ?>
                                 <h2><?= e($s['title'] ?? '') ?></h2>
                                 <p><?= nl2br(e($s['body'] ?? '')) ?></p>

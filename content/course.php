@@ -5,75 +5,103 @@
  * Each section: key, title, lessons.
  * Each lesson: key (unique, never rename once learners have progress), title,
  * type ('presentation' | 'quiz'), and for presentations a list of slides.
- * Each slide: ['title' => ..., 'body' => ...] and optionally 'image' => 'assets/slides/file.png'
- * (path relative to public/). When 'image' is set it is shown instead of the text.
+ * Each slide: ['title' => ..., 'image' => 'assets/slides/page-NN.webp'] where NN is the page
+ * number in the course deck PDF (path relative to public/; identical copies live in
+ * docs/assets/slides/). The title is the image alt text. A slide without 'image' shows
+ * 'title' and 'body' as text instead.
+ *
+ * Keep docs/assets/js/app.js (COURSE) in sync with this file.
  *
  * quiz_requires: section keys whose presentation lessons must be completed before the final quiz opens.
  */
-
-$placeholderSlides = static function (string $topic, int $count): array {
-    $slides = [];
-    for ($i = 1; $i <= $count; $i++) {
-        $slides[] = [
-            'title' => $topic . ' - Slaid ' . $i,
-            'body'  => 'Kandungan contoh untuk slaid ' . $i . ' bagi topik "' . $topic . '". '
-                . 'Gantikan teks ini dengan kandungan sebenar modul.',
-        ];
-    }
-    return $slides;
-};
-
 return [
     'key'           => 'ai-essentials',
     'title'         => 'Malaysia AWS AI Essentials',
     'quiz_requires' => ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'],
     'sections'      => [
         [
-            'key'     => 'pre-survey',
-            'title'   => 'Pre-Survey',
+            'key'     => 'pengenalan',
+            'title'   => 'Pengenalan',
             'lessons' => [
-                ['key' => 'pre-survey', 'title' => 'Pre-Survey', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Pre-Survey', 1)],
+                ['key' => 'pengenalan', 'title' => 'Pengenalan', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'AI Untuk Komuniti', 'image' => 'assets/slides/page-01.webp'],
+                    ['title' => 'Rakan Strategik Program: AWS', 'image' => 'assets/slides/page-07.webp'],
+                ]],
             ],
         ],
         [
             'key'     => 'modul-1',
             'title'   => 'Modul 1: Kesedaran AI & Keyakinan Digital',
             'lessons' => [
-                ['key' => 'modul-1-pengenalan', 'title' => 'Pengenalan AI', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Pengenalan AI', 5)],
+                ['key' => 'modul-1-pengenalan', 'title' => 'Pengenalan AI', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Modul 1: Kesedaran AI & Keyakinan Digital', 'image' => 'assets/slides/page-08.webp'],
+                    ['title' => 'Apakah Itu Kecerdasan Buatan (AI)?', 'image' => 'assets/slides/page-09.webp'],
+                    ['title' => 'AI Bukan Pengganti Kita, Tapi Pembantu Kita', 'image' => 'assets/slides/page-10.webp'],
+                ]],
             ],
         ],
         [
             'key'     => 'modul-2',
             'title'   => 'Modul 2: Asas AI',
             'lessons' => [
-                ['key' => 'modul-2-pengenalan', 'title' => 'Asas AI', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Asas AI', 5)],
+                ['key' => 'modul-2-pengenalan', 'title' => 'Asas AI', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Modul 2: Asas AI', 'image' => 'assets/slides/page-11.webp'],
+                    ['title' => 'Macam Mana AI Belajar?', 'image' => 'assets/slides/page-12.webp'],
+                    ['title' => 'Apakah Itu AI Generatif?', 'image' => 'assets/slides/page-13.webp'],
+                    ['title' => "'Perangai' Pekerja Baru AI Kita", 'image' => 'assets/slides/page-14.webp'],
+                ]],
             ],
         ],
         [
             'key'     => 'modul-3',
             'title'   => 'Modul 3: Kemahiran Praktikal AI',
             'lessons' => [
-                ['key' => 'modul-3-pengenalan', 'title' => 'Kemahiran Praktikal AI', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Kemahiran Praktikal AI', 5)],
+                ['key' => 'modul-3-pengenalan', 'title' => 'Kemahiran Praktikal AI', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Modul 3: Kemahiran Praktikal AI untuk Pembelajaran & Kerjaya', 'image' => 'assets/slides/page-15.webp'],
+                    ['title' => 'Apa Itu "AI Prompt"?', 'image' => 'assets/slides/page-16.webp'],
+                    ['title' => 'Mengapa Arahan yang Jelas Sangat Penting?', 'image' => 'assets/slides/page-17.webp'],
+                    ['title' => 'Selesaikan Masalah dengan Formula KOPI!', 'image' => 'assets/slides/page-18.webp'],
+                    ['title' => '4 Ramuan Rahsia dalam Secawan KOPI', 'image' => 'assets/slides/page-19.webp'],
+                    ['title' => 'Transformasi Prompt: Pemasaran Tudung Raya', 'image' => 'assets/slides/page-20.webp'],
+                    ['title' => '3 Peranan Utama AI untuk Bisnes Anda', 'image' => 'assets/slides/page-21.webp'],
+                    ['title' => "Latihan Berkumpulan: Selesaikan Krisis 'Sales Turun' (bisnes.ai)", 'image' => 'assets/slides/page-22.webp'],
+                    ['title' => "Latihan Berkumpulan: Selesaikan Krisis 'Sales Turun' (3 Langkah)", 'image' => 'assets/slides/page-23.webp'],
+                ]],
             ],
         ],
         [
             'key'     => 'modul-4',
             'title'   => 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti',
             'lessons' => [
-                ['key' => 'modul-4-pengenalan', 'title' => 'AI untuk Perniagaan Mikro', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('AI untuk Perniagaan Mikro', 5)],
+                ['key' => 'modul-4-pengenalan', 'title' => 'AI untuk Perniagaan Mikro', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti', 'image' => 'assets/slides/page-24.webp'],
+                    ['title' => 'Janji 45 Minit Anda', 'image' => 'assets/slides/page-25.webp'],
+                    ['title' => 'Langkah 1: Jana Idea Perniagaan', 'image' => 'assets/slides/page-26.webp'],
+                    ['title' => 'Langkah 1: Jana Idea Perniagaan (Kanvas Model Perniagaan)', 'image' => 'assets/slides/page-27.webp'],
+                    ['title' => 'Langkah 2: Tulis Copywriting Media Sosial', 'image' => 'assets/slides/page-28.webp'],
+                    ['title' => 'Langkah 2: Tulis Copywriting Media Sosial (Prompt KOPI)', 'image' => 'assets/slides/page-29.webp'],
+                    ['title' => 'Langkah 4: Visual Poster', 'image' => 'assets/slides/page-30.webp'],
+                    ['title' => 'Langkah 4: Visual Poster (Contoh Prompt)', 'image' => 'assets/slides/page-31.webp'],
+                    ['title' => 'Langkah 5: Komunikasi Pelanggan Profesional', 'image' => 'assets/slides/page-32.webp'],
+                    ['title' => 'Langkah 6: Skrip Video Promosi (30 Saat)', 'image' => 'assets/slides/page-33.webp'],
+                    ['title' => 'Langkah 6: Skrip Video Promosi (Prompt KOPI)', 'image' => 'assets/slides/page-34.webp'],
+                    ['title' => 'Jom Hasilkan Aplikasi (PartyRock)', 'image' => 'assets/slides/page-35.webp'],
+                ]],
             ],
         ],
         [
             'key'     => 'modul-5',
             'title'   => 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan',
             'lessons' => [
-                ['key' => 'modul-5-pengenalan', 'title' => 'AI Bertanggungjawab', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('AI Bertanggungjawab', 5)],
+                ['key' => 'modul-5-pengenalan', 'title' => 'AI Bertanggungjawab', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan', 'image' => 'assets/slides/page-36.webp'],
+                    ['title' => '4 Tanda Amaran: Gunakan S.T.O.P', 'image' => 'assets/slides/page-37.webp'],
+                    ['title' => 'Berhenti. Semak. Sahkan.', 'image' => 'assets/slides/page-38.webp'],
+                    ['title' => 'Jana Pendapatan Tambahan dengan Bantuan AI', 'image' => 'assets/slides/page-39.webp'],
+                    ['title' => "Apa Maksud 'Kerja Freelance'?", 'image' => 'assets/slides/page-40.webp'],
+                    ['title' => 'Kenali 4 Alat AI yang Akan Membantu Anda', 'image' => 'assets/slides/page-41.webp'],
+                    ['title' => 'Teruskan Pembelajaran Anda Selepas Bengkel Ini', 'image' => 'assets/slides/page-42.webp'],
+                ]],
             ],
         ],
         [
@@ -84,19 +112,12 @@ return [
             ],
         ],
         [
-            'key'     => 'post-survey',
-            'title'   => 'Post-Survey',
+            'key'     => 'penutup',
+            'title'   => 'Penutup',
             'lessons' => [
-                ['key' => 'post-survey', 'title' => 'Post-Survey', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Post-Survey', 1)],
-            ],
-        ],
-        [
-            'key'     => 'bonus',
-            'title'   => 'Bonus Konten!',
-            'lessons' => [
-                ['key' => 'bonus-konten', 'title' => 'Bonus Konten!', 'type' => 'presentation',
-                 'slides' => $placeholderSlides('Bonus Konten', 2)],
+                ['key' => 'penutup', 'title' => 'Penutup', 'type' => 'presentation', 'slides' => [
+                    ['title' => 'Terima Kasih', 'image' => 'assets/slides/page-45.webp'],
+                ]],
             ],
         ],
     ],
