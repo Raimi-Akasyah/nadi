@@ -86,6 +86,28 @@
     }
   }
 
+  // ---- Keep-alive ----
+  // Slide changes and quiz answers make no page request, so a long read (Modul 4 takes about 45 minutes)
+  // would hit the 30-minute idle timeout. While the learner is active, tell the server at most every
+  // KEEPALIVE_MS. A learner who stops interacting is still signed out after the timeout.
+  var csrfInput = document.querySelector('input[name="csrf"]');
+  var KEEPALIVE_MS = 4 * 60 * 1000;
+  var lastPing = Date.now(); // the page load itself counted as activity
+  var pinging = false;
+  var keepAlive = function () {
+    if (!csrfInput || pinging || Date.now() - lastPing < KEEPALIVE_MS || !window.fetch) return;
+    pinging = true;
+    var body = new URLSearchParams();
+    body.set('csrf', csrfInput.value);
+    fetch('keepalive.php', { method: 'POST', body: body, credentials: 'same-origin' })
+      .then(function () { lastPing = Date.now(); })
+      .catch(function () { /* offline: try again on the next activity */ })
+      .then(function () { pinging = false; });
+  };
+  ['click', 'keydown', 'pointerdown', 'touchstart', 'scroll', 'wheel', 'change'].forEach(function (type) {
+    document.addEventListener(type, keepAlive, { passive: true, capture: true });
+  });
+
   // ---- Sidebar search ----
   var search = document.getElementById('lesson-search');
   if (search) {

@@ -35,12 +35,74 @@ function learner_find(int $id): ?array
     return $row === false ? null : $row;
 }
 
+/** The learner for a remember-cookie token hash: the registration token or one added on resume. */
 function learner_find_by_token_hash(string $h): ?array
 {
     $stmt = db()->prepare('SELECT * FROM learners WHERE token_hash = ?');
     $stmt->execute([$h]);
     $row = $stmt->fetch();
+    if ($row !== false) {
+        return $row;
+    }
+    $stmt = db()->prepare(
+        'SELECT l.* FROM learner_tokens t JOIN learners l ON l.id = t.learner_id WHERE t.token_hash = ?'
+    );
+    $stmt->execute([$h]);
+    $row = $stmt->fetch();
     return $row === false ? null : $row;
+}
+
+/** Add a remember-cookie token for a learner (used when resuming with "Ingat saya" ticked). */
+function learner_token_add(int $learnerId, string $tokenHash): void
+{
+    $stmt = db()->prepare('INSERT INTO learner_tokens (learner_id, token_hash, created_at) VALUES (?, ?, ?)');
+    $stmt->execute([$learnerId, $tokenHash, now_str()]);
+}
+
+/**
+ * The learner to resume for an e-mail address (case-insensitive), or null.
+ * Earlier testing may have left several learners with one e-mail. The one with the most progress wins:
+ * a course completion first, then a passed quiz, then the most completed lessons, then the newest record.
+ */
+function learner_find_for_resume(string $email): ?array
+{
+    $stmt = db()->prepare(
+        'SELECT l.*,
+                (SELECT COUNT(*) FROM completions c WHERE c.learner_id = l.id) AS resume_completions,
+                (SELECT COUNT(*) FROM quiz_attempts a WHERE a.learner_id = l.id AND a.passed = 1) AS resume_passes,
+                (SELECT COUNT(*) FROM lesson_progress p WHERE p.learner_id = l.id) AS resume_lessons
+         FROM learners l
+         WHERE LOWER(l.email) = LOWER(?)
+         ORDER BY resume_completions DESC, resume_passes DESC, resume_lessons DESC, l.id DESC
+         LIMIT 1'
+    );
+    $stmt->execute([trim($email)]);
+    $row = $stmt->fetch();
+    if ($row === false) {
+        return null;
+    }
+    unset($row['resume_completions'], $row['resume_passes'], $row['resume_lessons']);
+    return $row;
+}
+
+/** Number of resume attempts since $since from this IP hash and for this e-mail hash. */
+function resume_attempt_counts(string $ipHash, string $emailHash, string $since): array
+{
+    $stmt = db()->prepare('SELECT COUNT(*) FROM resume_attempts WHERE ip_hash = ? AND created_at >= ?');
+    $stmt->execute([$ipHash, $since]);
+    $ip = (int)$stmt->fetchColumn();
+    $stmt = db()->prepare('SELECT COUNT(*) FROM resume_attempts WHERE email_hash = ? AND created_at >= ?');
+    $stmt->execute([$emailHash, $since]);
+    return ['ip' => $ip, 'email' => (int)$stmt->fetchColumn()];
+}
+
+/** Record a resume attempt and drop attempts older than one day. */
+function resume_attempt_record(string $ipHash, string $emailHash): void
+{
+    db()->prepare('DELETE FROM resume_attempts WHERE created_at < ?')
+        ->execute([date('Y-m-d H:i:s', time() - 86400)]);
+    db()->prepare('INSERT INTO resume_attempts (ip_hash, email_hash, created_at) VALUES (?, ?, ?)')
+        ->execute([$ipHash, $emailHash, now_str()]);
 }
 
 function progress_mark(int $learnerId, string $lessonKey): void

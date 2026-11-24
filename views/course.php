@@ -11,6 +11,7 @@
 /** @var array|null $attempt */
 /** @var int $attemptNo */
 /** @var array|null $completion */
+/** @var string|null $flash */
 
 $lessonUrl = static function (string $key, ?int $slideNo = null): string {
     $q = ['lesson' => $key];
@@ -23,7 +24,13 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
 <header class="topbar">
     <a class="topbar-home" href="index.php">&larr; Pergi ke Laman Utama</a>
     <a class="topbar-logo" href="index.php"><img src="assets/img/logo.svg" alt="NADI" height="32"></a>
-    <span class="topbar-user"><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></span>
+    <div class="topbar-right">
+        <span class="topbar-user"><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></span>
+        <form method="post" action="reset.php" class="inline-form">
+            <?= csrf_field() ?>
+            <button type="submit" class="btn btn-outline btn-sm">Selesai / Keluar</button>
+        </form>
+    </div>
 </header>
 
 <div class="course-layout">
@@ -78,6 +85,9 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
     </aside>
 
     <main class="content">
+        <?php if (!empty($flash)): ?>
+            <div class="alert alert-success" role="status"><?= e($flash) ?></div>
+        <?php endif; ?>
         <?php if ($lesson['type'] === 'presentation'): ?>
             <div class="lesson-header">
                 <h1><?= e($lesson['title']) ?></h1>

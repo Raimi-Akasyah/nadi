@@ -100,10 +100,14 @@
   // ---- State ----
   // Same rules as the PHP portal: by default the learner is kept only for this browser session
   // (sessionStorage) and forgotten after IDLE_MS without activity. Only when "Ingat saya" was ticked
-  // at registration (own device) is the state kept in localStorage.
+  // at registration (own device) is the state kept in localStorage, for REMEMBER_MS from registration.
+  // There is no server, so "Sambung Semula" (resume by e-mail on another device) is not possible here.
   var STORE_KEY = 'nadi-lms-draft-v1';
   var IDLE_MS = 30 * 60 * 1000; // LEARNER_IDLE_MINUTES in src/helpers.php
-  function emptyState() { return { learner: null, done: {}, attempts: [], completion: null, remember: false, lastActive: 0 }; }
+  var REMEMBER_MS = 30 * 86400 * 1000; // LEARNER_COOKIE_DAYS in src/helpers.php
+  function emptyState() {
+    return { learner: null, done: {}, attempts: [], completion: null, remember: false, rememberUntil: 0, lastActive: 0 };
+  }
   function storage(remember) {
     try { return remember ? window.localStorage : window.sessionStorage; } catch (e) { return null; }
   }
@@ -120,8 +124,15 @@
     var s = read(storage(false));
     var remember = false;
     if (!s) {
-      s = read(storage(true));
-      remember = true; // also covers drafts saved before this option existed
+      var local = storage(true);
+      s = read(local);
+      remember = true;
+      // Drop localStorage state saved before "Ingat saya" existed (no remember flag), and remembered
+      // state past its 30 days, so a shared computer does not keep an earlier learner.
+      if (s && (s.remember !== true || typeof s.rememberUntil !== 'number' || Date.now() > s.rememberUntil)) {
+        try { local.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+        s = null;
+      }
     }
     if (!s) return emptyState();
     return {
@@ -130,7 +141,8 @@
       attempts: Array.isArray(s.attempts) ? s.attempts : [],
       completion: s.completion || null,
       remember: remember,
-      lastActive: typeof s.lastActive === 'number' ? s.lastActive : Date.now()
+      rememberUntil: remember ? s.rememberUntil : 0,
+      lastActive: typeof s.lastActive === 'number' ? s.lastActive : 0
     };
   }
   var state = load();
@@ -147,14 +159,32 @@
       try { if (store) store.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
     });
   }
-  // Forget a session-only learner who has been idle too long. Returns true when that happened.
+  // Forget a session-only learner who has been idle too long, or a remembered learner after 30 days.
+  // Returns true when that happened.
   function expireIfIdle() {
-    if (state.learner && !state.remember && Date.now() - state.lastActive > IDLE_MS) {
+    if (!state.learner) return false;
+    var expired = state.remember ? Date.now() > state.rememberUntil : Date.now() - state.lastActive > IDLE_MS;
+    if (expired) {
       resetState();
       return true;
     }
     return false;
   }
+  // Activity without a route change (slide navigation, answering the quiz) also keeps the learner
+  // active, like the keep-alive in public/assets/js/course.js.
+  function touch() {
+    if (!state.learner || Date.now() - state.lastActive < 60 * 1000) return;
+    if (expireIfIdle()) { go('#/daftar'); return; }
+    save();
+  }
+  ['click', 'keydown', 'pointerdown', 'touchstart', 'scroll', 'wheel', 'change'].forEach(function (type) {
+    document.addEventListener(type, touch, { passive: true, capture: true });
+  });
+  // The real portal lets a learner continue on any device by entering their e-mail ("Sambung Semula").
+  // This draft has no server, so it says so instead of pretending.
+  var RESUME_DRAFT_NOTE = '"Sambung Semula" dengan e-mel hanya berfungsi dalam portal sebenar. ' +
+    'Draf ini tiada pelayan: kemajuan anda disimpan dalam pelayar ini sahaja dan tidak boleh disambung ' +
+    'pada peranti atau pelayar lain.';
   var justSignedOut = false;
   function signOut() {
     resetState();
@@ -255,6 +285,9 @@
         '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/daftar">Daftar Sekarang</a></div>' +
         '<p class="muted small">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.</p>';
     }
+    var resumeCard = state.learner ? '' :
+      '<section class="container" id="sambung-semula"><div class="card resume-card"><h2>Sambung Semula</h2>' +
+      '<p>' + RESUME_DRAFT_NOTE + '</p></div></section>';
     setPage('', siteHeader() +
       '<main><section class="hero"><div class="container">' +
       '<p class="eyebrow">Kursus Dalam Talian NADI</p>' +
@@ -262,7 +295,7 @@
       '<p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri. ' +
       'Lengkapkan kelima-lima modul, lulus Kuiz Akhir dengan markah sekurang-kurangnya ' + QUIZ.passMark +
       '%, dan muat turun sijil penyelesaian anda serta-merta.</p>' + actions +
-      '</div></section>' +
+      '</div></section>' + resumeCard +
       '<section class="container"><h2>Kandungan Kursus</h2><ol class="section-list">' + list + '</ol></section></main>');
     var reset = document.getElementById('reset-btn');
     if (reset) reset.addEventListener('click', signOut);
@@ -318,6 +351,7 @@
       '<main class="container narrow"><div class="card">' +
       '<h1>Pendaftaran Peserta</h1>' +
       '<p class="muted">Isi maklumat di bawah untuk mula belajar. Nama anda akan dicetak pada sijil seperti yang ditulis di sini.</p>' +
+      '<div class="alert alert-info" id="resume-draft-note">' + RESUME_DRAFT_NOTE + '</div>' +
       (hasErrors ? '<div class="alert alert-error" role="alert">Sila betulkan ralat di bawah.</div>' : '') +
       '<form class="form" id="register-form" novalidate>' + fields +
       '<div class="field field-check"><label for="f-remember">' +
@@ -325,8 +359,8 @@
       'Ingat saya pada peranti ini selama 30 hari</label>' +
       '<p class="muted small field-help">Tandakan hanya jika ini telefon atau komputer anda sendiri. ' +
       'Di komputer awam atau dikongsi (contohnya di pusat komuniti atau kafe), biarkan kosong: ' +
-      'anda akan dikeluarkan apabila menekan "Selesai / Keluar", apabila pelayar ditutup, ' +
-      'atau selepas 30 minit tanpa aktiviti, jadi selesaikan kursus dalam satu sesi.</p></div>' +
+      'tekan "Selesai / Keluar" sebelum meninggalkan komputer. Menutup pelayar sahaja tidak ' +
+      'semestinya mengeluarkan anda. Anda juga akan dikeluarkan selepas 30 minit tanpa aktiviti.</p></div>' +
       '<button type="submit" class="btn btn-primary btn-block">Hantar &amp; Mula Kursus</button>' +
       '</form></div></main>');
     document.getElementById('register-form').addEventListener('submit', function (ev) {
@@ -345,6 +379,7 @@
       res.clean.age = parseInt(res.clean.age, 10);
       state.learner = res.clean;
       state.remember = remember;
+      state.rememberUntil = remember ? Date.now() + REMEMBER_MS : 0;
       save();
       go('#/kursus');
     });
@@ -395,7 +430,8 @@
     setPage(lesson.title,
       '<header class="topbar"><a class="topbar-home" href="#/">&larr; Pergi ke Laman Utama</a>' +
       '<a class="topbar-logo" href="#/"><img src="assets/img/logo.svg" alt="NADI" height="32"></a>' +
-      '<span class="topbar-user">' + e(fullName()) + '</span></header>' +
+      '<div class="topbar-right"><span class="topbar-user">' + e(fullName()) + '</span>' +
+      '<button type="button" class="btn btn-outline btn-sm" id="topbar-signout-btn">Selesai / Keluar</button></div></header>' +
       '<div class="course-layout"><aside class="sidebar">' +
       '<h2 class="sidebar-title">' + e(COURSE.title) + '</h2>' +
       '<div class="progress"><div class="progress-text">' + percent + '% selesai</div>' +
@@ -405,6 +441,7 @@
       '<nav class="sidebar-sections">' + sidebar + '</nav></aside>' +
       '<main class="content">' + main + '</main></div>');
 
+    document.getElementById('topbar-signout-btn').addEventListener('click', signOut);
     bindSearch();
     if (lesson.type === 'presentation') bindViewer(lesson, slide, slideCount);
     else bindQuiz(lesson);

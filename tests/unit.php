@@ -130,6 +130,16 @@ check(strpos($pdf, '23 November 2026') !== false, "certificate PDF contains '23 
 check(strpos($pdf, 'NADI-0123456789') !== false, 'certificate PDF contains the code');
 check(pdf_text('Caf' . "\u{00E9}") === "Caf\xE9", 'pdf_text converts UTF-8 to windows-1252');
 
+// --- Sambung Semula: e-mail validation and rate limit ---
+check(validate_resume_email(['email' => '  a@example.com '])  === ['a@example.com', null], 'resume e-mail is trimmed and accepted');
+check(validate_resume_email([])[1] !== null, 'empty resume e-mail is rejected');
+check(validate_resume_email(['email' => 'bukan-emel'])[1] === 'Alamat e-mel tidak sah.', 'invalid resume e-mail is rejected');
+check(validate_resume_email(['email' => ['x']])[1] !== null, 'array resume e-mail is rejected');
+check(!resume_rate_limited(['ip' => RESUME_MAX_PER_IP - 1, 'email' => RESUME_MAX_PER_EMAIL - 1]), 'resume below both limits is allowed');
+check(resume_rate_limited(['ip' => RESUME_MAX_PER_IP, 'email' => 0]), 'resume at the per-IP limit is refused');
+check(resume_rate_limited(['ip' => 0, 'email' => RESUME_MAX_PER_EMAIL]), 'resume at the per-e-mail limit is refused');
+check(RESUME_MAX_PER_IP >= 30, 'per-IP resume limit leaves room for 30 learners behind one IP');
+
 // --- Learner idle timeout ---
 $now = 1_800_000_000;
 check(LEARNER_IDLE_MINUTES === 30, 'learner idle timeout is 30 minutes');

@@ -7,16 +7,31 @@ declare(strict_types=1);
 require __DIR__ . '/../src/bootstrap.php';
 
 $base = rtrim($argv[1] ?? 'http://127.0.0.1:8080', '/');
-$jar = tempnam(sys_get_temp_dir(), 'nadi_e2e_');
-$ch = curl_init();
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_HEADER         => true,
-    CURLOPT_FOLLOWLOCATION => false,
-    CURLOPT_COOKIEJAR      => $jar,
-    CURLOPT_COOKIEFILE     => $jar,
-    CURLOPT_TIMEOUT        => 20,
-]);
+$jars = [];
+$devices = [];
+$ch = null;
+
+/** Switch the test browser to device $name (its own cookie jar), creating it on first use. */
+function device(string $name): void
+{
+    global $ch, $devices, $jars;
+    if (!isset($devices[$name])) {
+        $jar = tempnam(sys_get_temp_dir(), 'nadi_e2e_');
+        $jars[] = $jar;
+        $h = curl_init();
+        curl_setopt_array($h, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HEADER         => true,
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_COOKIEJAR      => $jar,
+            CURLOPT_COOKIEFILE     => $jar,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $devices[$name] = $h;
+    }
+    $ch = $devices[$name];
+}
+device('main');
 
 /** @return array{status:int, location:string, type:string, body:string} */
 function http(string $method, string $path, ?array $fields = null): array
@@ -82,6 +97,52 @@ function register_learner(string $first, string $last, string $email, bool $reme
         $fields['remember'] = '1';
     }
     return http('POST', 'register.php', $fields);
+}
+
+/**
+ * Pretend the current device's last request was $secondsAgo seconds ago by editing the dev server's
+ * session file (test and server must run on the same machine).
+ */
+function age_session(int $secondsAgo): bool
+{
+    $sid = cookies()['nadi_lms_session']['value'] ?? '';
+    $file = rtrim((string)session_save_path() ?: sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR . 'sess_' . $sid;
+    if ($sid === '' || !is_file($file)) {
+        return false;
+    }
+    $data = (string)file_get_contents($file);
+    $data = preg_replace('/last_active\|i:\d+;/', 'last_active|i:' . (time() - $secondsAgo) . ';', $data, 1, $n);
+    return $n === 1 && file_put_contents($file, $data) !== false;
+}
+
+/** "Sambung Semula" with an e-mail on the current device; returns the response. */
+function resume_with(string $email, bool $remember = false): array
+{
+    $page = http('GET', 'resume.php');
+    $fields = ['csrf' => csrf_from($page['body']), 'email' => $email];
+    if ($remember) {
+        $fields['remember'] = '1';
+    }
+    return http('POST', 'resume.php', $fields);
+}
+
+/** Mark lessons complete on the current device (as if the learner reached the last slide of each). */
+function complete_lessons(array $keys): bool
+{
+    $ok = true;
+    foreach ($keys as $key) {
+        $page = http('GET', 'course.php?lesson=' . $key . '&slide=5');
+        $r = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($page['body']), 'lesson' => $key]);
+        $ok = $ok && $r['status'] === 302 && strpos($r['location'], 'course.php?lesson=') === 0;
+    }
+    return $ok;
+}
+
+function learner_ids_by_email(string $email): array
+{
+    $stmt = db()->prepare('SELECT id FROM learners WHERE email = ? ORDER BY id');
+    $stmt->execute([$email]);
+    return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
 /** True when GET $path redirects to the registration page (nobody is signed in). */
@@ -293,20 +354,12 @@ try {
     $lastC = 'E2EC' . $suffix;
     register_learner('Ujian', $lastC, 'e2e-c+' . $suffix . '@example.com', false);
     $before = http('GET', '/');
-    $sid = cookies()['nadi_lms_session']['value'] ?? '';
-    $sessFile = rtrim((string)session_save_path() ?: sys_get_temp_dir(), '\\/') . DIRECTORY_SEPARATOR . 'sess_' . $sid;
-    $aged = false;
-    if ($sid !== '' && is_file($sessFile)) {
-        $data = (string)file_get_contents($sessFile);
-        $old = time() - (LEARNER_IDLE_MINUTES * 60 + 60);
-        $data = preg_replace('/last_active\|i:\d+;/', 'last_active|i:' . $old . ';', $data, 1, $n);
-        $aged = $n === 1 && file_put_contents($sessFile, $data) !== false;
-    }
+    $aged = age_session(LEARNER_IDLE_MINUTES * 60 + 60);
     $after = http('GET', '/');
     step(15, 'after ' . LEARNER_IDLE_MINUTES . ' idle minutes the learner is signed out',
         $aged && strpos($before['body'], $lastC) !== false && strpos($after['body'], $lastC) === false
         && redirects_to_register('course.php'),
-        $aged ? '' : "could not age session file $sessFile");
+        $aged ? '' : 'could not age the session file');
 
     // 16. Own device: "Ingat saya" keeps the learner across a browser restart until "Bukan anda? Mula semula".
     $lastD = 'E2ED' . $suffix;
@@ -336,13 +389,151 @@ try {
         !$hadCookie && strpos($home['body'], $lastE) === false && strpos($home['body'], $lastF) === false,
         'cookie=' . ($hadCookie ? 'yes' : 'no') . ' E=' . (strpos($home['body'], $lastE) !== false ? 'shown' : 'hidden')
         . ' F=' . (strpos($home['body'], $lastF) !== false ? 'shown' : 'hidden'));
+
+    // "Sambung Semula" (resume by e-mail). Rate-limit rows from earlier local runs would get in the way.
+    $localIp = hash('sha256', '127.0.0.1');
+    db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$localIp]);
+    $allLessons = count($course->lessons());
+
+    // 18. Device 1: learner G registers without "Ingat saya", completes Modul 1-2, presses Keluar.
+    device('device-1');
+    $lastG = 'E2EG' . $suffix;
+    $emailG = 'e2e-g+' . $suffix . '@example.com';
+    register_learner('Ujian', $lastG, $emailG, false);
+    $ok = complete_lessons(['modul-1-pengenalan', 'modul-2-pengenalan']);
+    $page = http('GET', 'course.php');
+    $r = http('POST', 'reset.php', ['csrf' => csrf_from($page['body'])]);
+    $idsG = learner_ids_by_email($emailG);
+    step(18, 'device 1: G completes 2 lessons, the course page has Selesai / Keluar, G signs out',
+        $ok && count($idsG) === 1 && count(progress_keys($idsG[0])) === 2
+        && strpos($page['body'], 'Selesai / Keluar') !== false && $r['location'] === 'index.php?keluar=1');
+
+    // 19. Device 2 (fresh browser): Sambung Semula with G's e-mail (different letter case) restores G's progress.
+    device('device-2');
+    $home = http('GET', '/');
+    $r = resume_with(strtoupper($emailG));
+    $page = http('GET', 'course.php');
+    $pct = (int)round(2 * 100 / $allLessons);
+    step(19, 'device 2: Sambung Semula with G\'s e-mail restores G\'s progress (no remember cookie)',
+        strpos($home['body'], 'Sambung Semula') !== false && strpos($home['body'], 'action="resume.php"') !== false
+        && $r['status'] === 302 && $r['location'] === 'course.php'
+        && strpos($page['body'], 'Kemajuan anda telah disambung semula') !== false
+        && strpos($page['body'], $lastG) !== false
+        && strpos($page['body'], 'progress-text">' . $pct . '% selesai') !== false
+        && !isset(cookies()[LEARNER_COOKIE]),
+        "status {$r['status']} location {$r['location']}");
+
+    // 20. G finishes on device 2 and downloads the certificate with G's name.
+    $ok = complete_lessons(['modul-3-pengenalan', 'modul-4-pengenalan', 'modul-5-pengenalan']);
+    $r = quiz_post(answers_with($quiz, 9));
+    $res = http('GET', $r['location']);
+    $r = http('POST', 'complete.php', ['csrf' => csrf_from($res['body'])]);
+    $pdf = http('GET', 'certificate-download.php');
+    step(20, 'device 2: G finishes, passes and downloads a certificate with G\'s name',
+        $ok && $r['location'] === 'certificate.php' && strncmp($pdf['body'], '%PDF', 4) === 0
+        && strpos($pdf['body'], 'Ujian ' . $lastG) !== false && completion_find($idsG[0], $courseKey) !== null);
+
+    // 21. Unknown e-mail: Malay not-found message with a link to registration.
+    device('device-3');
+    $r = resume_with('tiada-' . $suffix . '@example.com');
+    step(21, 'unknown e-mail shows the Malay not-found message and offers registration',
+        $r['status'] === 404 && strpos($r['body'], 'Tiada peserta berdaftar dengan e-mel ini') !== false
+        && strpos($r['body'], 'href="register.php"') !== false && redirects_to_register('course.php'),
+        "status {$r['status']}");
+
+    // 22. Registering again with G's e-mail resumes G (no duplicate row; G's name stays on the certificate).
+    $r = register_learner('Lain', 'Orang' . $suffix, $emailG, false);
+    $page = http('GET', 'course.php');
+    $cert = http('GET', 'certificate.php');
+    step(22, 're-registering with an existing e-mail resumes that learner without creating a duplicate',
+        $r['status'] === 302 && $r['location'] === 'course.php' && learner_ids_by_email($emailG) === $idsG
+        && strpos($page['body'], 'E-mel ini sudah berdaftar') !== false
+        && strpos($cert['body'], 'Ujian ' . $lastG) !== false && strpos($cert['body'], 'Orang' . $suffix) === false);
+
+    // 23. Duplicate e-mails left by earlier testing: the record with the most progress is resumed.
+    $emailDup = 'e2e-dup+' . $suffix . '@example.com';
+    $dupFields = ['age' => 30, 'email' => $emailDup, 'phone' => '0123456789', 'address' => 'Ujian', 'occupation' => 'Penguji'];
+    $older = learner_create(['first_name' => 'Lama', 'last_name' => 'Dup' . $suffix] + $dupFields, hash('sha256', random_bytes(32)));
+    $newer = learner_create(['first_name' => 'Baru', 'last_name' => 'Dup' . $suffix] + $dupFields, hash('sha256', random_bytes(32)));
+    progress_mark($older, 'modul-1-pengenalan');
+    progress_mark($older, 'modul-2-pengenalan');
+    progress_mark($newer, 'modul-1-pengenalan');
+    device('device-4');
+    resume_with($emailDup);
+    $page = http('GET', 'course.php');
+    $pickMost = strpos($page['body'], 'Lama Dup' . $suffix) !== false;
+    progress_mark($newer, 'modul-2-pengenalan');
+    device('device-5');
+    resume_with($emailDup);
+    $page = http('GET', 'course.php');
+    $tieNewest = strpos($page['body'], 'Baru Dup' . $suffix) !== false;
+    step(23, 'duplicate e-mail: the learner with the most progress is resumed, the newest on a tie; no rows removed',
+        $pickMost && $tieNewest && learner_ids_by_email($emailDup) === [$older, $newer]);
+
+    // 24. Long reading: more than the idle timeout inside one module, with slide activity, keeps the learner.
+    device('reader');
+    $lastH = 'E2EH' . $suffix;
+    register_learner('Ujian', $lastH, 'e2e-h+' . $suffix . '@example.com', false);
+    $page = http('GET', 'course.php?lesson=modul-4-pengenalan&slide=1');
+    $csrf = csrf_from($page['body']);
+    $ok = strpos($page['body'], 'assets/js/course.js') !== false;
+    for ($i = 0; $i < 3; $i++) {
+        $ok = $ok && age_session(20 * 60); // 20 minutes on slides without a page request
+        $ping = http('POST', 'keepalive.php', ['csrf' => $csrf]);
+        $ok = $ok && $ping['status'] === 204;
+    }
+    $ok = $ok && age_session(20 * 60);
+    $r = http('POST', 'lesson-complete.php', ['csrf' => $csrf, 'lesson' => 'modul-4-pengenalan']);
+    $idH = learner_ids_by_email('e2e-h+' . $suffix . '@example.com')[0] ?? 0;
+    device('no-session');
+    $anon = http('POST', 'keepalive.php', ['csrf' => csrf_from(http('GET', 'resume.php')['body'])]);
+    step(24, '80 minutes reading Modul 4 with keep-alive pings: lesson-complete still saves the progress',
+        $ok && $r['status'] === 302 && $r['location'] === 'course.php?lesson=modul-5-pengenalan'
+        && in_array('modul-4-pengenalan', progress_keys($idH), true) && $anon['status'] === 401,
+        "complete status {$r['status']} location {$r['location']} anon keepalive {$anon['status']}");
+
+    // 25. "Ingat saya" on two own devices: resuming with the box ticked on device B keeps device A remembered.
+    device('phone');
+    $lastI = 'E2EI' . $suffix;
+    $emailI = 'e2e-i+' . $suffix . '@example.com';
+    register_learner('Ujian', $lastI, $emailI, true);
+    device('laptop');
+    resume_with($emailI, true);
+    $laptopCookie = cookies()[LEARNER_COOKIE] ?? null;
+    close_browser();
+    $laptop = http('GET', '/');
+    device('phone');
+    close_browser();
+    $phone = http('GET', '/');
+    step(25, 'Sambung Semula with Ingat saya sets a 30-day cookie and the first device stays remembered',
+        $laptopCookie !== null && $laptopCookie['expires'] > time() + (LEARNER_COOKIE_DAYS - 1) * 86400
+        && strpos($laptop['body'], $lastI) !== false && strpos($phone['body'], $lastI) !== false);
+
+    // 26. Rate limit: after RESUME_MAX_PER_EMAIL tries for one e-mail, the next one is refused with 429.
+    device('attacker');
+    $target = 'e2e-rl+' . $suffix . '@example.com';
+    $statuses = [];
+    for ($i = 0; $i <= RESUME_MAX_PER_EMAIL; $i++) {
+        $statuses[] = resume_with($target)['status'];
+    }
+    $last = array_pop($statuses);
+    $r = resume_with($target);
+    step(26, 'Sambung Semula is rate limited (' . RESUME_MAX_PER_EMAIL . ' tries per e-mail per '
+        . RESUME_WINDOW_MINUTES . ' minutes)',
+        array_unique($statuses) === [404] && $last === 429 && strpos($r['body'], 'Terlalu banyak cubaan') !== false,
+        'statuses ' . implode(',', $statuses) . " then $last");
+    db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$localIp]);
 } catch (Throwable $ex) {
     $failures++;
     echo 'FAIL aborted: ' . $ex->getMessage() . "\n";
 }
 
-curl_close($ch);
-@unlink($jar);
+foreach ($devices as $h) {
+    curl_close($h);
+}
+foreach ($jars as $jar) {
+    @unlink($jar);
+}
 
 echo $failures === 0 ? "\nAll e2e steps passed.\n" : "\n$failures e2e step(s) failed.\n";
 exit($failures === 0 ? 0 : 1);

@@ -86,4 +86,5 @@ render('course', [
     'attempt'    => $attempt,
     'attemptNo'  => $attemptNo,
     'completion' => $completion,
+    'flash'      => flash_take(),
 ]);

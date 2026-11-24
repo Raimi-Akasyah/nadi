@@ -16,6 +16,32 @@ CREATE TABLE IF NOT EXISTS learners (
     UNIQUE KEY uq_learners_token_hash (token_hash)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Extra "Ingat saya" tokens, one per device where a learner resumed by e-mail with the box ticked.
+-- (The token from registration stays in learners.token_hash.)
+CREATE TABLE IF NOT EXISTS learner_tokens (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    learner_id INT UNSIGNED NOT NULL,
+    token_hash CHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_learner_tokens_hash (token_hash),
+    KEY idx_learner_tokens_learner (learner_id),
+    CONSTRAINT fk_learner_tokens_learner FOREIGN KEY (learner_id)
+        REFERENCES learners (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- "Sambung Semula" (resume by e-mail) attempts, for rate limiting. IP and e-mail are stored as SHA-256 hashes.
+CREATE TABLE IF NOT EXISTS resume_attempts (
+    id INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    ip_hash CHAR(64) NOT NULL,
+    email_hash CHAR(64) NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_resume_ip (ip_hash, created_at),
+    KEY idx_resume_email (email_hash, created_at),
+    KEY idx_resume_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS lesson_progress (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     learner_id INT UNSIGNED NOT NULL,

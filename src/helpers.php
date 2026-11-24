@@ -5,6 +5,11 @@ const LEARNER_COOKIE = 'nadi_lms_token';
 const LEARNER_COOKIE_DAYS = 30;
 // A learner session ends after this many minutes without a page request.
 const LEARNER_IDLE_MINUTES = 30;
+// "Sambung Semula" (resume by e-mail) limits per RESUME_WINDOW_MINUTES. A community centre may put
+// 30 learners behind one IP address, so the per-IP limit leaves room for each of them to resume.
+const RESUME_WINDOW_MINUTES = 15;
+const RESUME_MAX_PER_IP = 40;
+const RESUME_MAX_PER_EMAIL = 10;
 
 /** Escape a value for HTML output. */
 function e($value): string
@@ -167,6 +172,55 @@ function login_learner(int $id, string $rawToken, bool $remember): void
     } else {
         set_learner_cookie('', time() - 3600);
     }
+}
+
+/**
+ * Sign in an existing learner found by e-mail ("Sambung Semula", or registering again with the same e-mail).
+ * With $remember a new token is stored for this device, so "Ingat saya" on other devices keeps working.
+ */
+function resume_login(array $learner, bool $remember): void
+{
+    $rawToken = bin2hex(random_bytes(32));
+    if ($remember) {
+        learner_token_add((int)$learner['id'], hash('sha256', $rawToken));
+    }
+    login_learner((int)$learner['id'], $rawToken, $remember);
+}
+
+/** True when either the per-IP or the per-e-mail resume limit has been reached. */
+function resume_rate_limited(array $counts): bool
+{
+    return ($counts['ip'] ?? 0) >= RESUME_MAX_PER_IP || ($counts['email'] ?? 0) >= RESUME_MAX_PER_EMAIL;
+}
+
+/**
+ * Rate limit for looking up a learner by e-mail. Returns false when the limit is reached;
+ * otherwise records the attempt and returns true.
+ */
+function resume_attempt_allowed(string $email): bool
+{
+    $ipHash = hash('sha256', (string)($_SERVER['REMOTE_ADDR'] ?? ''));
+    $emailHash = hash('sha256', strtolower(trim($email)));
+    $since = date('Y-m-d H:i:s', time() - RESUME_WINDOW_MINUTES * 60);
+    if (resume_rate_limited(resume_attempt_counts($ipHash, $emailHash, $since))) {
+        return false;
+    }
+    resume_attempt_record($ipHash, $emailHash);
+    return true;
+}
+
+/** Store a one-time message for the next page. */
+function flash_set(string $message): void
+{
+    $_SESSION['flash'] = $message;
+}
+
+/** The one-time message, if any, removed from the session. */
+function flash_take(): ?string
+{
+    $msg = $_SESSION['flash'] ?? null;
+    unset($_SESSION['flash']);
+    return is_string($msg) ? $msg : null;
 }
 
 function forget_learner(): void

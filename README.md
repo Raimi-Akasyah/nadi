@@ -2,7 +2,7 @@
 
 A small learning portal for the NADI community course "Malaysia AWS AI Essentials".
 
-Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account, password or sign-in (see [Shared computers and own devices](#shared-computers-and-own-devices) for how long the browser remembers them). They then go through Modul 1 to Modul 5 in a slide viewer and take a 10-question final quiz (Kuiz Akhir). A score of at least 75% passes, and attempts are unlimited. After passing, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
+Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account or password. A learner who comes back later, on the same or another device, continues with "Sambung Semula" by entering only their e-mail (see [Continuing later: Sambung Semula](#continuing-later-sambung-semula) and [Shared computers and own devices](#shared-computers-and-own-devices)). They then go through Modul 1 to Modul 5 in a slide viewer and take a 10-question final quiz (Kuiz Akhir). A score of at least 75% passes, and attempts are unlimited. After passing, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
 
 Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 
@@ -17,7 +17,7 @@ Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 | `config/` | `config.example.php`. Your real `config.php` goes here and is not committed. |
 | `sql/` | `schema.sql`, imported once with phpMyAdmin. |
 | `lib/fpdf/` | FPDF 1.86, used to build the certificate PDF. |
-| `tests/` | `lint.ps1`, `unit.php`, `e2e.php`. |
+| `tests/` | `lint.ps1`, `unit.php`, `e2e.php`, `docs-check.mjs` (headless-browser check of `docs/`). |
 
 Every folder except `public/` has an `.htaccess` with `Require all denied`, as a second guard in case the document root is not changed.
 
@@ -29,7 +29,7 @@ Every folder except `public/` has an `.htaccess` with `Require all denied`, as a
 ## Deploying on Plesk
 
 1. **Create the database.** Websites & Domains → Databases → Add Database. Enter a database name, then create a database user and password. Note the host (usually `localhost`).
-2. **Import the tables.** In the database list, click phpMyAdmin for the new database, open the Import tab, choose `sql/schema.sql` and click Import. This creates `learners`, `lesson_progress`, `quiz_attempts` and `completions`. Registrations, progress, quiz attempts and certificates are stored here and can be viewed in phpMyAdmin.
+2. **Import the tables.** In the database list, click phpMyAdmin for the new database, open the Import tab, choose `sql/schema.sql` and click Import. This creates `learners`, `learner_tokens`, `resume_attempts`, `lesson_progress`, `quiz_attempts` and `completions`. Registrations, progress, quiz attempts and certificates are stored here and can be viewed in phpMyAdmin. **Updating an existing site:** import `sql/schema.sql` again. Every table uses `CREATE TABLE IF NOT EXISTS`, so this only adds the new `learner_tokens` and `resume_attempts` tables and leaves existing data alone.
 3. **Upload the files** to `httpdocs/` with File Manager (upload a zip and extract it) or with Plesk Git. The result should be `httpdocs/public`, `httpdocs/src`, `httpdocs/config` and so on.
 4. **Set the document root.** Hosting Settings (Hosting & DNS → Hosting) → Document root: `httpdocs/public`. Save.
 5. **Configure the database connection.** Copy `config/config.example.php` to `config/config.php` and fill in the host, database name, user and password from step 1. Alternatively, leave `config/config.php` absent and set the environment variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` in PHP Settings. Never commit `config/config.php`.
@@ -56,16 +56,32 @@ The slide text and quiz questions in `docs/assets/js/app.js` are copied from `co
 - **Which modules unlock the quiz:** `quiz_requires` in `content/course.php`.
 - **Certificate issuer text:** `certificate.issuer` in `config/config.php`. The layout is in `src/CertificatePdf.php`.
 
+## Continuing later: Sambung Semula
+
+Progress (lessons done, quiz pass and certificate) is stored in the database against the learner, not in the browser. To continue, the learner opens the site, goes to "Sambung Semula" (on the landing page, or the link on the registration page, `resume.php`), and enters the e-mail they registered with. No code or password is asked for.
+
+- **Same device, next day.** If "Ingat saya" was ticked, the site opens straight at their progress. If not, or after "Selesai / Keluar" or the 30-minute timeout, they enter their e-mail in "Sambung Semula" and continue where they stopped.
+- **Different device.** They enter their e-mail in "Sambung Semula" and get the same progress, quiz result and certificate. Nothing is reset.
+- **E-mail not found.** The page says "Tiada peserta berdaftar dengan e-mel ini" and offers registration.
+- **Registering again with the same e-mail** does not create a second learner. It resumes the existing one and says "E-mel ini sudah berdaftar, jadi kemajuan anda yang sedia ada telah disambung semula", with the name that will appear on the certificate. The details typed in the new form are not saved; the original name stays on the certificate.
+- **Several learners with one e-mail** (left from earlier testing): the one with the most progress is resumed. The order is a course completion first, then a passed quiz, then the most completed lessons, and the newest record on a tie. No rows are merged or deleted.
+
+E-mail matching ignores letter case and surrounding spaces. Anyone who knows a learner's e-mail can resume as that learner and download their certificate. This was a deliberate choice to keep the course free of codes and passwords.
+
+Abuse protection: each lookup by e-mail (Sambung Semula, or registering with an e-mail that already exists) is counted in `resume_attempts`, with the IP address and e-mail stored only as SHA-256 hashes. Within 15 minutes, one IP address may make 40 lookups and one e-mail may be looked up 10 times (`RESUME_*` constants in `src/helpers.php`). The per-IP limit is high on purpose, because a community centre with 30 learners usually shares one public IP address. Beyond the limit the page answers "Terlalu banyak cubaan Sambung Semula" (HTTP 429). Rows older than a day are deleted automatically. The forms use the same CSRF token as the rest of the site, and all SQL is parameterized.
+
 ## Shared computers and own devices
 
-The course is used both on shared computers (community centres, cafes) and on learners' own phones and laptops. The registration form has an unticked checkbox, "Ingat saya pada peranti ini selama 30 hari".
+The course is used both on shared computers (community centres, cafes) and on learners' own phones and laptops. The registration and Sambung Semula forms have an unticked checkbox, "Ingat saya pada peranti ini selama 30 hari".
 
-- **Not ticked (the default, for shared computers).** The learner is kept only in the browser session. They are signed out when they press "Selesai / Keluar" on the certificate page, when the browser is closed, or after 30 minutes without a page request (`LEARNER_IDLE_MINUTES` in `src/helpers.php`). The course has to be finished in one sitting. Registering without the box ticked also removes any earlier learner's remember cookie on that browser.
-- **Ticked (own device).** A 30-day cookie (`LEARNER_COOKIE_DAYS`) brings the learner back to their progress after the browser is reopened. Only a SHA-256 hash of the cookie's random token is stored in the database.
+- **Not ticked (the default, for shared computers).** The learner is kept only in the browser session. They are signed out when they press "Selesai / Keluar" (on every course page and on the certificate page) or after 30 minutes without activity (`LEARNER_IDLE_MINUTES` in `src/helpers.php`). Do not rely on closing the browser: Chrome and Edge can restore the previous session, including its cookies, when "Continue where you left off" is on. Tell learners on shared computers to press "Selesai / Keluar" before they leave. Their progress stays saved, and they can continue later with Sambung Semula. Registering or resuming without the box ticked also removes any earlier learner's remember cookie on that browser.
+- **Ticked (own device).** A 30-day cookie (`LEARNER_COOKIE_DAYS`) brings the learner back to their progress after the browser is reopened. Only a SHA-256 hash of the cookie's random token is stored in the database. Ticking it on a second device (through Sambung Semula) adds a token in `learner_tokens`, so both devices stay remembered.
 
-"Selesai / Keluar" (certificate page) and "Bukan anda? Mula semula" (landing page) both sign out: they clear the session, delete the remember cookie and show "Anda telah keluar". After that the browser shows no name or progress and the certificate pages redirect to registration. The progress itself stays in the database. Cookies are HttpOnly, SameSite=Lax and marked secure over HTTPS, and every form uses a CSRF token.
+**Long reading.** Slide changes and quiz answers happen in the browser without loading a page. While the learner is active (clicks, keys, scrolling, touches), `public/assets/js/course.js` sends a small keep-alive request to `keepalive.php` at most every 4 minutes, so a learner reading one long module (Modul 4 takes about 45 minutes) is not signed out. A learner who stops interacting for 30 minutes is still signed out.
 
-The `docs/` draft follows the same rules: without the box ticked it keeps its data in `sessionStorage` and forgets it after 30 idle minutes; with the box ticked it uses `localStorage`.
+"Selesai / Keluar" and "Bukan anda? Mula semula" (landing page) both sign out: they clear the session, delete the remember cookie and show "Anda telah keluar". After that the browser shows no name or progress and the course and certificate pages redirect to registration. The progress itself stays in the database. Cookies are HttpOnly, SameSite=Lax and marked secure over HTTPS, and every form uses a CSRF token.
+
+The `docs/` draft follows the same rules where it can: without the box ticked it keeps its data in `sessionStorage` and forgets it after 30 minutes without activity; with the box ticked it uses `localStorage` for 30 days from registration. Data saved in `localStorage` by the draft before "Ingat saya" existed is dropped. The draft has no server, so Sambung Semula cannot work there: it shows a note that Sambung Semula only works in the real portal and that progress stays in that browser only.
 
 ## Certificate verification
 
@@ -105,6 +121,11 @@ powershell -ExecutionPolicy Bypass -File tests/lint.ps1
 
 # End-to-end test (needs the database and the dev server running)
 & 'C:\xampp 8.2\php\php.exe' tests/e2e.php http://127.0.0.1:8080
+
+# docs/ draft in headless Chrome or Edge, served under /nadi/ like GitHub Pages (needs Node 22+)
+node tests/docs-check.mjs
 ```
 
-The e2e test registers new learners with unique `e2e...+<time>@example.com` e-mails, so it leaves test rows in the local database. Steps 11 to 17 cover shared computers: a learner who finishes and presses "Selesai / Keluar", a closed browser, the idle timeout (it ages the dev server's session file, so run it on the same machine as the server) and the "Ingat saya" cookie.
+The e2e test registers new learners with unique `e2e...+<time>@example.com` e-mails, so it leaves test rows in the local database. Steps 11 to 17 cover shared computers: a learner who finishes and presses "Selesai / Keluar", a closed browser, the idle timeout and the "Ingat saya" cookie. Steps 18 to 26 cover Sambung Semula: progress made on one device (cookie jar) restored on a fresh one and finished there with a certificate in the learner's name, the not-found message, registering again with the same e-mail, duplicate e-mails, 80 minutes in one module kept alive by `keepalive.php`, "Ingat saya" on two devices, and the rate limit. The idle-timeout steps age the dev server's session file, so run the test on the same machine as the server. The test clears rate-limit rows for 127.0.0.1 before and after it runs.
+
+`tests/docs-check.mjs` starts its own static server for `docs/` under `/nadi/` and a headless browser (Chrome, Edge, or `CHROME_PATH`). It fails on any console error. It covers the shared-computer flow, the idle timeout, long reading with slide clicks, the 30-day "Ingat saya" expiry, dropping data from the old draft, and the Sambung Semula note.

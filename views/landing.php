@@ -27,10 +27,21 @@
                 <div class="hero-actions">
                     <a class="btn btn-primary btn-lg" href="register.php">Daftar Sekarang</a>
                 </div>
-                <p class="muted small">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.</p>
+                <p class="muted small">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.
+                    Sudah mendaftar? <a class="hero-link" href="#sambung-semula">Sambung Semula</a> dengan e-mel anda.</p>
             <?php endif; ?>
         </div>
     </section>
+    <?php if ($learner === null): ?>
+        <section class="container" id="sambung-semula">
+            <div class="card resume-card">
+                <h2>Sambung Semula</h2>
+                <p class="muted">Sudah mendaftar sebelum ini, di peranti ini atau peranti lain? Masukkan e-mel anda
+                    untuk menyambung kemajuan, kuiz dan sijil anda. Tiada kata laluan diperlukan.</p>
+                <?php require __DIR__ . '/resume-form.php'; ?>
+            </div>
+        </section>
+    <?php endif; ?>
 
     <section class="container">
         <h2>Kandungan Kursus</h2>

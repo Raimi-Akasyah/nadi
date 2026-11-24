@@ -75,3 +75,19 @@ function validate_registration(array $in): array
 
     return [$clean, $errors];
 }
+
+/**
+ * Validate the "Sambung Semula" e-mail field.
+ * Returns [$email, $error]; $error is a Malay message or null.
+ */
+function validate_resume_email(array $in): array
+{
+    $email = is_string($in['email'] ?? null) ? trim($in['email']) : '';
+    if ($email === '') {
+        return [$email, 'Sila masukkan alamat e-mel yang anda gunakan semasa mendaftar.'];
+    }
+    if (strlen($email) > 190 || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+        return [$email, 'Alamat e-mel tidak sah.'];
+    }
+    return [$email, null];
+}
