@@ -1,6 +1,7 @@
 /*
  * NADI LMS static preview (GitHub Pages draft).
- * Mirrors the PHP portal's flow with no backend: state lives in localStorage only.
+ * Mirrors the PHP portal's flow with no backend: state lives in the browser only
+ * (sessionStorage, or localStorage when "Ingat saya" is ticked).
  * Content below is copied from content/course.php and content/quiz.php.
  */
 (function () {
@@ -96,32 +97,69 @@
     return l.type === 'quiz' ? 'KUIZ - ' + QUIZ.questions.length + ' SOALAN' : 'PEMBENTANGAN';
   }
 
-  // ---- State (localStorage) ----
+  // ---- State ----
+  // Same rules as the PHP portal: by default the learner is kept only for this browser session
+  // (sessionStorage) and forgotten after IDLE_MS without activity. Only when "Ingat saya" was ticked
+  // at registration (own device) is the state kept in localStorage.
   var STORE_KEY = 'nadi-lms-draft-v1';
-  function emptyState() { return { learner: null, done: {}, attempts: [], completion: null }; }
-  function load() {
+  var IDLE_MS = 30 * 60 * 1000; // LEARNER_IDLE_MINUTES in src/helpers.php
+  function emptyState() { return { learner: null, done: {}, attempts: [], completion: null, remember: false, lastActive: 0 }; }
+  function storage(remember) {
+    try { return remember ? window.localStorage : window.sessionStorage; } catch (e) { return null; }
+  }
+  function read(store) {
     try {
-      var raw = window.localStorage.getItem(STORE_KEY);
-      if (!raw) return emptyState();
-      var s = JSON.parse(raw);
-      if (!s || typeof s !== 'object') return emptyState();
-      return {
-        learner: s.learner || null,
-        done: s.done || {},
-        attempts: Array.isArray(s.attempts) ? s.attempts : [],
-        completion: s.completion || null
-      };
+      var raw = store ? store.getItem(STORE_KEY) : null;
+      var s = raw ? JSON.parse(raw) : null;
+      return s && typeof s === 'object' ? s : null;
     } catch (e) {
-      return emptyState();
+      return null;
     }
+  }
+  function load() {
+    var s = read(storage(false));
+    var remember = false;
+    if (!s) {
+      s = read(storage(true));
+      remember = true; // also covers drafts saved before this option existed
+    }
+    if (!s) return emptyState();
+    return {
+      learner: s.learner || null,
+      done: s.done || {},
+      attempts: Array.isArray(s.attempts) ? s.attempts : [],
+      completion: s.completion || null,
+      remember: remember,
+      lastActive: typeof s.lastActive === 'number' ? s.lastActive : Date.now()
+    };
   }
   var state = load();
   function save() {
-    try { window.localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode: keep in memory */ }
+    state.lastActive = Date.now();
+    var keep = storage(state.remember);
+    var other = storage(!state.remember);
+    try { if (keep) keep.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* private mode: keep in memory */ }
+    try { if (other) other.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
   }
   function resetState() {
     state = emptyState();
-    try { window.localStorage.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+    [storage(true), storage(false)].forEach(function (store) {
+      try { if (store) store.removeItem(STORE_KEY); } catch (e) { /* ignore */ }
+    });
+  }
+  // Forget a session-only learner who has been idle too long. Returns true when that happened.
+  function expireIfIdle() {
+    if (state.learner && !state.remember && Date.now() - state.lastActive > IDLE_MS) {
+      resetState();
+      return true;
+    }
+    return false;
+  }
+  var justSignedOut = false;
+  function signOut() {
+    resetState();
+    justSignedOut = true;
+    go('#/');
   }
 
   // ---- Utilities ----
@@ -178,6 +216,7 @@
     var r = parseHash();
     viewerCtl = null;
     document.body.className = '';
+    if (!expireIfIdle() && state.learner) save();
     if (r.path === '/daftar') return renderRegister();
     if (r.path === '/kursus') {
       if (!state.learner) return go('#/daftar');
@@ -212,7 +251,8 @@
         '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/kursus">Teruskan Kursus</a>' +
         '<button type="button" class="btn-link" id="reset-btn">Bukan anda? Mula semula</button></div>';
     } else {
-      actions = '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/daftar">Daftar Sekarang</a></div>' +
+      actions = (justSignedOut ? '<div class="alert alert-success" role="status">Anda telah keluar. Maklumat anda tidak lagi dipaparkan pada peranti ini.</div>' : '') +
+        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/daftar">Daftar Sekarang</a></div>' +
         '<p class="muted small">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.</p>';
     }
     setPage('', siteHeader() +
@@ -225,7 +265,8 @@
       '</div></section>' +
       '<section class="container"><h2>Kandungan Kursus</h2><ol class="section-list">' + list + '</ol></section></main>');
     var reset = document.getElementById('reset-btn');
-    if (reset) reset.addEventListener('click', function () { resetState(); render(); });
+    if (reset) reset.addEventListener('click', signOut);
+    justSignedOut = false;
   }
 
   // ---- Registration ----
@@ -261,7 +302,7 @@
     return { clean: c, errors: err };
   }
 
-  function renderRegister(old, errors) {
+  function renderRegister(old, errors, remember) {
     old = old || {};
     errors = errors || {};
     var hasErrors = Object.keys(errors).length > 0;
@@ -279,15 +320,23 @@
       '<p class="muted">Isi maklumat di bawah untuk mula belajar. Nama anda akan dicetak pada sijil seperti yang ditulis di sini.</p>' +
       (hasErrors ? '<div class="alert alert-error" role="alert">Sila betulkan ralat di bawah.</div>' : '') +
       '<form class="form" id="register-form" novalidate>' + fields +
+      '<div class="field field-check"><label for="f-remember">' +
+      '<input id="f-remember" name="remember" type="checkbox" value="1"' + (remember ? ' checked' : '') + '> ' +
+      'Ingat saya pada peranti ini selama 30 hari</label>' +
+      '<p class="muted small field-help">Tandakan hanya jika ini telefon atau komputer anda sendiri. ' +
+      'Di komputer awam atau dikongsi (contohnya di pusat komuniti atau kafe), biarkan kosong: ' +
+      'anda akan dikeluarkan apabila menekan "Selesai / Keluar", apabila pelayar ditutup, ' +
+      'atau selepas 30 minit tanpa aktiviti, jadi selesaikan kursus dalam satu sesi.</p></div>' +
       '<button type="submit" class="btn btn-primary btn-block">Hantar &amp; Mula Kursus</button>' +
       '</form></div></main>');
     document.getElementById('register-form').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var input = {};
       FIELDS.forEach(function (f) { input[f[0]] = ev.target.elements[f[0]].value; });
+      var remember = ev.target.elements.remember.checked;
       var res = validateRegistration(input);
       if (Object.keys(res.errors).length > 0) {
-        renderRegister(res.clean, res.errors);
+        renderRegister(res.clean, res.errors, remember);
         var firstBad = app.querySelector('.has-error input');
         if (firstBad) firstBad.focus();
         return;
@@ -295,6 +344,7 @@
       resetState();
       res.clean.age = parseInt(res.clean.age, 10);
       state.learner = res.clean;
+      state.remember = remember;
       save();
       go('#/kursus');
     });
@@ -559,11 +609,19 @@
       '<dt>Kursus</dt><dd>' + e(COURSE.title) + '</dd>' +
       '<dt>Tarikh</dt><dd>' + e(formatDateMs(c.completedAt)) + '</dd>' +
       '<dt>No. Sijil</dt><dd>' + e(c.code) + '</dd></dl>' +
-      '<p><button type="button" class="btn btn-primary btn-lg" id="download-btn">Muat Turun Sijil (PDF)</button></p>' +
+      '<div class="certificate-actions">' +
+      '<button type="button" class="btn btn-primary btn-lg" id="download-btn">Muat Turun Sijil (PDF)</button>' +
+      '<button type="button" class="btn btn-outline btn-lg" id="signout-btn">Selesai / Keluar</button></div>' +
+      '<p class="muted small">Selepas memuat turun sijil, tekan "Selesai / Keluar" supaya nama, kemajuan dan sijil anda ' +
+      'tidak dipaparkan kepada pengguna seterusnya pada peranti ini. Di komputer awam, simpan fail sijil ' +
+      'ke telefon atau e-mel anda dan padamkan salinan daripada komputer tersebut.</p>' +
       '<p class="muted small">Ini sijil contoh daripada draf pratonton. Pengesahan sijil hanya tersedia dalam portal sebenar.</p>' +
       '<p><a href="' + courseHref(quizLesson().key) + '">Kembali ke kursus</a></p>' +
       '</div></main>');
+    document.getElementById('signout-btn').addEventListener('click', signOut);
     document.getElementById('download-btn').addEventListener('click', function () {
+      if (expireIfIdle() || !state.completion) return go('#/daftar');
+      save();
       var data = {
         first_name: state.learner.first_name,
         last_name: state.learner.last_name,

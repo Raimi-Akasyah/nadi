@@ -3,6 +3,8 @@ declare(strict_types=1);
 
 const LEARNER_COOKIE = 'nadi_lms_token';
 const LEARNER_COOKIE_DAYS = 30;
+// A learner session ends after this many minutes without a page request.
+const LEARNER_IDLE_MINUTES = 30;
 
 /** Escape a value for HTML output. */
 function e($value): string
@@ -84,7 +86,16 @@ function format_date_ms(string $datetime): string
     return date('j', $ts) . ' ' . $months[(int)date('n', $ts)] . ' ' . date('Y', $ts);
 }
 
-/** The learner for this browser (session first, then the remember cookie), or null. */
+/**
+ * True when a learner session has been idle for longer than LEARNER_IDLE_MINUTES.
+ * Sessions without a recorded last activity (0) count as expired.
+ */
+function learner_session_expired(int $lastActive, int $now): bool
+{
+    return $now - $lastActive > LEARNER_IDLE_MINUTES * 60;
+}
+
+/** The learner for this browser (session first, then the "remember me" cookie), or null. */
 function current_learner(): ?array
 {
     static $resolved = false;
@@ -95,11 +106,18 @@ function current_learner(): ?array
     $resolved = true;
 
     if (isset($_SESSION['learner_id'])) {
-        $learner = learner_find((int)$_SESSION['learner_id']);
-        if ($learner !== null) {
-            return $learner;
+        if (learner_session_expired((int)($_SESSION['last_active'] ?? 0), time())) {
+            // Idle too long: end the session so the next person on a shared computer starts clean.
+            unset($_SESSION['learner_id'], $_SESSION['last_active']);
+            session_regenerate_id(true);
+        } else {
+            $learner = learner_find((int)$_SESSION['learner_id']);
+            if ($learner !== null) {
+                $_SESSION['last_active'] = time();
+                return $learner;
+            }
+            unset($_SESSION['learner_id'], $_SESSION['last_active']);
         }
-        unset($_SESSION['learner_id']);
     }
 
     $raw = $_COOKIE[LEARNER_COOKIE] ?? '';
@@ -108,6 +126,7 @@ function current_learner(): ?array
         if ($learner !== null) {
             session_regenerate_id(true);
             $_SESSION['learner_id'] = (int)$learner['id'];
+            $_SESSION['last_active'] = time();
         }
     }
     return $learner;
@@ -122,17 +141,32 @@ function require_learner(): array
     return $learner;
 }
 
-function login_learner(int $id, string $rawToken): void
+/** Set (or, with an empty value, delete) the "remember me" cookie. */
+function set_learner_cookie(string $value, int $expires): void
 {
-    session_regenerate_id(true);
-    $_SESSION['learner_id'] = $id;
-    setcookie(LEARNER_COOKIE, $rawToken, [
-        'expires'  => time() + LEARNER_COOKIE_DAYS * 86400,
+    setcookie(LEARNER_COOKIE, $value, [
+        'expires'  => $expires,
         'path'     => '/',
         'secure'   => is_https(),
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
+}
+
+/**
+ * Sign the learner in for this browser session. Only when $remember is true (the learner ticked
+ * "Ingat saya" on their own device) is a persistent cookie set; otherwise any earlier one is removed.
+ */
+function login_learner(int $id, string $rawToken, bool $remember): void
+{
+    session_regenerate_id(true);
+    $_SESSION['learner_id'] = $id;
+    $_SESSION['last_active'] = time();
+    if ($remember) {
+        set_learner_cookie($rawToken, time() + LEARNER_COOKIE_DAYS * 86400);
+    } else {
+        set_learner_cookie('', time() - 3600);
+    }
 }
 
 function forget_learner(): void
@@ -141,11 +175,5 @@ function forget_learner(): void
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
     }
-    setcookie(LEARNER_COOKIE, '', [
-        'expires'  => time() - 3600,
-        'path'     => '/',
-        'secure'   => is_https(),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    set_learner_cookie('', time() - 3600);
 }

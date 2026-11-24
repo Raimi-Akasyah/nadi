@@ -106,6 +106,9 @@ h1, h2, h3 { line-height: 1.25; }
 .form input:focus { outline: 2px solid var(--primary); outline-offset: 0; border-color: var(--primary); }
 .field.has-error input { border-color: var(--danger); }
 .field-error { color: var(--danger); margin: 4px 0 0; font-size: 0.875rem; }
+.form .field-check label { display: flex; gap: 8px; align-items: flex-start; }
+.form .field-check input { width: auto; margin: 4px 0 0; }
+.field-help { margin: 4px 0 0 24px; }
 .req { color: var(--danger); }
 .alert { padding: 12px 14px; border-radius: 6px; margin: 0 0 16px; }
 .alert-error { background: #fdecea; color: var(--danger); }
@@ -217,4 +220,5 @@ h1, h2, h3 { line-height: 1.25; }
 .certificate-details { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 20px 0; }
 .certificate-details dt { font-weight: 600; color: var(--muted); }
 .certificate-details dd { margin: 0; }
+.certificate-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 12px; }
 .verify-result { margin-top: 20px; }

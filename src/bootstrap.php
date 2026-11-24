@@ -70,6 +70,8 @@ function is_https(): bool
 }
 
 if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
+    // Keep session data at least as long as the learner idle timeout (LEARNER_IDLE_MINUTES, 30).
+    ini_set('session.gc_maxlifetime', '1800');
     session_name('nadi_lms_session');
     session_set_cookie_params([
         'lifetime' => 0,

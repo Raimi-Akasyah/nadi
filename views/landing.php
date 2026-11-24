@@ -1,6 +1,7 @@
 <?php
 /** @var Course $course */
 /** @var array|null $learner */
+/** @var bool $signedOut */
 ?>
 <main>
     <section class="hero">
@@ -20,6 +21,9 @@
                     </form>
                 </div>
             <?php else: ?>
+                <?php if (!empty($signedOut)): ?>
+                    <div class="alert alert-success" role="status">Anda telah keluar. Maklumat anda tidak lagi dipaparkan pada peranti ini.</div>
+                <?php endif; ?>
                 <div class="hero-actions">
                     <a class="btn btn-primary btn-lg" href="register.php">Daftar Sekarang</a>
                 </div>

@@ -2,7 +2,7 @@
 
 A small learning portal for the NADI community course "Malaysia AWS AI Essentials".
 
-Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account, password or sign-in. They then go through Modul 1 to Modul 5 in a slide viewer and take a 10-question final quiz (Kuiz Akhir). A score of at least 75% passes, and attempts are unlimited. After passing, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
+Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account, password or sign-in (see [Shared computers and own devices](#shared-computers-and-own-devices) for how long the browser remembers them). They then go through Modul 1 to Modul 5 in a slide viewer and take a 10-question final quiz (Kuiz Akhir). A score of at least 75% passes, and attempts are unlimited. After passing, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
 
 Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 
@@ -40,7 +40,7 @@ Open the site. The landing page shows "Daftar Sekarang".
 
 ## Static preview on GitHub Pages (draft)
 
-`docs/` holds a static copy of the portal for previewing before the Plesk deployment: landing page, registration form (client-side checks only), module viewer, Kuiz Akhir and a certificate PDF generated in the browser. It is plain HTML, CSS and JavaScript with no backend. Nothing is sent to a server; progress is kept in the browser's localStorage, and every page shows "Draf / pratonton — data tidak disimpan". The quiz answers are visible in `docs/assets/js/app.js`, so use it for preview only.
+`docs/` holds a static copy of the portal for previewing before the Plesk deployment: landing page, registration form (client-side checks only), module viewer, Kuiz Akhir and a certificate PDF generated in the browser. It is plain HTML, CSS and JavaScript with no backend. Nothing is sent to a server; progress is kept in the browser (sessionStorage, or localStorage when "Ingat saya" is ticked, as described below), and every page shows "Draf / pratonton — data tidak disimpan". The quiz answers are visible in `docs/assets/js/app.js`, so use it for preview only.
 
 To publish it: on GitHub open the repository → Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: **main**, folder **/docs** → Save. After a minute the preview is at `https://raimi-akasyah.github.io/nadi/`.
 
@@ -55,6 +55,17 @@ The slide text and quiz questions in `docs/assets/js/app.js` are copied from `co
 - **Pass mark:** change `pass_mark` in `content/quiz.php` (default 75). A learner passes when `correct * 100 / total >= pass_mark`.
 - **Which modules unlock the quiz:** `quiz_requires` in `content/course.php`.
 - **Certificate issuer text:** `certificate.issuer` in `config/config.php`. The layout is in `src/CertificatePdf.php`.
+
+## Shared computers and own devices
+
+The course is used both on shared computers (community centres, cafes) and on learners' own phones and laptops. The registration form has an unticked checkbox, "Ingat saya pada peranti ini selama 30 hari".
+
+- **Not ticked (the default, for shared computers).** The learner is kept only in the browser session. They are signed out when they press "Selesai / Keluar" on the certificate page, when the browser is closed, or after 30 minutes without a page request (`LEARNER_IDLE_MINUTES` in `src/helpers.php`). The course has to be finished in one sitting. Registering without the box ticked also removes any earlier learner's remember cookie on that browser.
+- **Ticked (own device).** A 30-day cookie (`LEARNER_COOKIE_DAYS`) brings the learner back to their progress after the browser is reopened. Only a SHA-256 hash of the cookie's random token is stored in the database.
+
+"Selesai / Keluar" (certificate page) and "Bukan anda? Mula semula" (landing page) both sign out: they clear the session, delete the remember cookie and show "Anda telah keluar". After that the browser shows no name or progress and the certificate pages redirect to registration. The progress itself stays in the database. Cookies are HttpOnly, SameSite=Lax and marked secure over HTTPS, and every form uses a CSRF token.
+
+The `docs/` draft follows the same rules: without the box ticked it keeps its data in `sessionStorage` and forgets it after 30 idle minutes; with the box ticked it uses `localStorage`.
 
 ## Certificate verification
 
@@ -96,4 +107,4 @@ powershell -ExecutionPolicy Bypass -File tests/lint.ps1
 & 'C:\xampp 8.2\php\php.exe' tests/e2e.php http://127.0.0.1:8080
 ```
 
-The e2e test registers a new learner with a unique `e2e+<time>@example.com` e-mail, so it leaves test rows in the local database.
+The e2e test registers new learners with unique `e2e...+<time>@example.com` e-mails, so it leaves test rows in the local database. Steps 11 to 17 cover shared computers: a learner who finishes and presses "Selesai / Keluar", a closed browser, the idle timeout (it ages the dev server's session file, so run it on the same machine as the server) and the "Ingat saya" cookie.

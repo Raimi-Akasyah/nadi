@@ -1,6 +1,7 @@
 <?php
 /** @var array $old */
 /** @var array $errors */
+/** @var bool $remember */
 $fields = [
     'first_name' => ['Nama Pertama', 'text', 'maxlength="100" autocomplete="given-name"'],
     'last_name'  => ['Nama Akhir', 'text', 'maxlength="100" autocomplete="family-name"'],
@@ -32,6 +33,16 @@ $fields = [
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
+            <div class="field field-check">
+                <label for="f-remember">
+                    <input id="f-remember" name="remember" type="checkbox" value="1"<?= !empty($remember) ? ' checked' : '' ?>>
+                    Ingat saya pada peranti ini selama 30 hari
+                </label>
+                <p class="muted small field-help">Tandakan hanya jika ini telefon atau komputer anda sendiri.
+                    Di komputer awam atau dikongsi (contohnya di pusat komuniti atau kafe), biarkan kosong:
+                    anda akan dikeluarkan apabila menekan "Selesai / Keluar", apabila pelayar ditutup,
+                    atau selepas 30 minit tanpa aktiviti, jadi selesaikan kursus dalam satu sesi.</p>
+            </div>
             <button type="submit" class="btn btn-primary btn-block">Hantar &amp; Mula Kursus</button>
         </form>
     </div>

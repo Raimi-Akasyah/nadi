@@ -130,5 +130,13 @@ check(strpos($pdf, '23 November 2026') !== false, "certificate PDF contains '23 
 check(strpos($pdf, 'NADI-0123456789') !== false, 'certificate PDF contains the code');
 check(pdf_text('Caf' . "\u{00E9}") === "Caf\xE9", 'pdf_text converts UTF-8 to windows-1252');
 
+// --- Learner idle timeout ---
+$now = 1_800_000_000;
+check(LEARNER_IDLE_MINUTES === 30, 'learner idle timeout is 30 minutes');
+check(!learner_session_expired($now - 60, $now), 'session active 1 minute ago is not expired');
+check(!learner_session_expired($now - 30 * 60, $now), 'session active exactly 30 minutes ago is not expired');
+check(learner_session_expired($now - 30 * 60 - 1, $now), 'session idle for more than 30 minutes is expired');
+check(learner_session_expired(0, $now), 'session with no recorded activity is expired');
+
 echo $failures === 0 ? "\nAll tests passed.\n" : "\n$failures test(s) failed.\n";
 exit($failures === 0 ? 0 : 1);

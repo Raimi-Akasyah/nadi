@@ -4,8 +4,10 @@ declare(strict_types=1);
 require __DIR__ . '/../src/bootstrap.php';
 
 $course = Course::load();
+$learner = current_learner();
 render('landing', [
-    'title'   => $course->title(),
-    'course'  => $course,
-    'learner' => current_learner(),
+    'title'     => $course->title(),
+    'course'    => $course,
+    'learner'   => $learner,
+    'signedOut' => $learner === null && isset($_GET['keluar']),
 ]);

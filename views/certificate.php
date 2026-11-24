@@ -18,7 +18,16 @@ $verifyUrl = 'verify.php?' . http_build_query(['code' => $completion['certificat
             <dt>No. Sijil</dt>
             <dd><?= e($completion['certificate_code']) ?></dd>
         </dl>
-        <p><a class="btn btn-primary btn-lg" href="certificate-download.php">Muat Turun Sijil (PDF)</a></p>
+        <div class="certificate-actions">
+            <a class="btn btn-primary btn-lg" href="certificate-download.php">Muat Turun Sijil (PDF)</a>
+            <form method="post" action="reset.php" class="inline-form">
+                <?= csrf_field() ?>
+                <button type="submit" class="btn btn-outline btn-lg">Selesai / Keluar</button>
+            </form>
+        </div>
+        <p class="muted small">Selepas memuat turun sijil, tekan "Selesai / Keluar" supaya nama, kemajuan dan sijil anda
+            tidak dipaparkan kepada pengguna seterusnya pada peranti ini. Di komputer awam, simpan fail sijil
+            ke telefon atau e-mel anda dan padamkan salinan daripada komputer tersebut.</p>
         <p class="muted small">Sesiapa boleh menyemak kesahihan sijil ini di
             <a href="<?= e($verifyUrl) ?>">halaman pengesahan sijil</a>.</p>
         <p><a href="course.php">Kembali ke kursus</a></p>
