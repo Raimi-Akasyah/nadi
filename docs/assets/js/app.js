@@ -7,6 +7,8 @@
  */
 (function () {
   'use strict';
+  // The drawer CSS (course sidebar below 960px) applies only under html.js, as in views/layout.php.
+  document.documentElement.classList.add('js');
 
   // ---- Content (keep in sync with content/course.php and content/quiz.php) ----
   var COURSE = {
@@ -390,8 +392,61 @@
     return renderLanding();
   }
 
+  // Inline SVG icons (decorative). Same paths and markup as icon() in views/icons.php.
+  var ICONS = {
+    alert: '<circle cx="12" cy="12" r="9.5"/><path d="M12 7.5v5.5M12 16.5h.01"/>',
+    arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    award: '<circle cx="12" cy="9" r="6"/><path d="m8.5 13.8-1.5 7.7 5-3 5 3-1.5-7.7"/>',
+    back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+    book: '<path d="M2 5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v15a2 2 0 0 0-2-2H2z"/><path d="M22 5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v15a2 2 0 0 1 2-2h8z"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    clipboard: '<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2.5h6V4"/><path d="m9 13 2 2 4-4"/>',
+    download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
+    expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',
+    flag: '<path d="M5 21V4"/><path d="M5 4h12l-2.5 4.5L17 13H5"/>',
+    gift: '<rect x="3" y="8" width="18" height="5" rx="1"/><path d="M19 13v8H5v-8M12 8v13"/><path d="M12 8H8a2.5 2.5 0 1 1 0-5c3 0 4 5 4 5zM12 8h4a2.5 2.5 0 1 0 0-5c-3 0-4 5-4 5z"/>',
+    home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M10 21v-6h4v6"/>',
+    info: '<circle cx="12" cy="12" r="9.5"/><path d="M12 11v6M12 7.5h.01"/>',
+    list: '<path d="M9 6h12M9 12h12M9 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
+    lock: '<rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/><path d="M12 15v2"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m3.5 7 8.5 6 8.5-6"/>',
+    next: '<path d="m9 18 6-6-6-6"/>',
+    prev: '<path d="m15 18-6-6 6-6"/>',
+    quiz: '<circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.2a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.6-2.8 2.6"/><path d="M12 16.8h.01"/>',
+    refresh: '<path d="M3 12a9 9 0 0 1 15.4-6.4L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15.4 6.4L3 16"/><path d="M3 21v-5h5"/>',
+    search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
+    shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+    slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/><path d="m10.5 8 4 2-4 2z"/>',
+    user: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/>'
+  };
+  function icon(name, cls) {
+    return '<svg class="icon' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"' +
+      ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' +
+      (ICONS[name] || '') + '</svg>';
+  }
+  function initials() {
+    if (!state.learner) return '';
+    return (String(state.learner.first_name).trim().charAt(0) + String(state.learner.last_name).trim().charAt(0)).toUpperCase();
+  }
+  var BLOBS = '<img class="blob blob-tr" src="assets/img/blob-orange.svg" alt="" aria-hidden="true" width="487" height="354">' +
+    '<img class="blob blob-bl" src="assets/img/blob-amber.svg" alt="" aria-hidden="true" width="425" height="309">';
+  var CONFETTI = '<div class="confetti" aria-hidden="true">' + new Array(15).join('<i></i>') + '</div>';
+  // "Dengan kerjasama" partner lockup (views/partners.php).
+  function partners() {
+    return '<div class="partner-lockup"><span class="partner-label">Dengan kerjasama</span>' +
+      '<img class="partner-logo" src="assets/img/logo-aws.webp" alt="AWS" width="50" height="32">' +
+      '<img class="partner-logo" src="assets/img/logo-pepperlabs.webp" alt="Pepper Labs" width="89" height="32"></div>';
+  }
   function siteHeader() {
-    return '<header class="site-header"><a class="site-logo" href="#/"><img src="assets/img/logo.svg" alt="NADI" height="36"></a></header>';
+    return '<header class="site-header"><div class="site-header-inner">' +
+      '<a class="site-logo" href="#/"><img src="assets/img/logo.svg" alt="NADI" width="108" height="36"></a>' +
+      partners() + '</div></header>';
+  }
+  // Footer of views/layout.php. The draft has no verification page, so it has no verify link.
+  function siteFooter() {
+    return '<footer class="site-footer"><div class="container site-footer-inner">' + partners() +
+      '<div class="site-footer-meta"><p class="site-footer-name">NADI LMS</p>' +
+      '<p class="small">Kursus AI percuma untuk komuniti.</p></div></div></footer>';
   }
   function setPage(title, html) {
     document.title = (title ? title + ' | ' : '') + 'NADI LMS (Draf)';
@@ -400,33 +455,72 @@
   }
 
   // ---- Landing ----
+  // Same markup as views/landing.php. The draft has no "Sambung Semula" form: its card explains why.
+  var STEPS = [
+    ['user', 'Daftar', 'Isi maklumat asas anda. Tiada akaun atau kata laluan.'],
+    ['book', 'Belajar', 'Ikuti slaid setiap modul mengikut kadar anda sendiri, di telefon atau komputer.'],
+    ['clipboard', 'Kuiz', 'Lulus kuiz modul untuk membuka modul yang seterusnya.'],
+    ['award', 'Sijil', 'Muat turun sijil penyelesaian (PDF) dengan nama anda.']
+  ];
   function renderLanding() {
-    var list = COURSE.sections.map(function (s) {
-      return '<li><strong>' + e(s.title) + '</strong><span class="muted small">' +
-        s.lessons.map(function (l) { return e(lessonLabel(l)); }).join(' &middot; ') + '</span></li>';
+    var moduleCount = COURSE.sections.filter(function (s) { return s.key.indexOf('modul') === 0; }).length;
+    var modules = COURSE.sections.map(function (s) {
+      var isModule = s.key.indexOf('modul-') === 0;
+      var isIntro = s.key === 'pengenalan';
+      return '<li class="module-card' + (isModule ? '' : (isIntro ? ' is-intro' : ' is-outro')) + '">' +
+        '<span class="module-badge" aria-hidden="true">' + (isModule ? e(s.key.slice(6)) : (isIntro ? 'Mula' : icon('flag'))) + '</span>' +
+        '<div class="module-body"><h3 class="module-title">' + e(s.title) + '</h3><ul class="chip-list">' +
+        s.lessons.map(function (l) {
+          return '<li class="chip' + (l.type === 'quiz' ? ' chip-quiz' : '') + '">' + icon(l.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(l)) + '</li>';
+        }).join('') + '</ul></div></li>';
+    }).join('');
+    var steps = STEPS.map(function (s, i) {
+      return '<li class="step"><span class="step-icon">' + icon(s[0]) + '<span class="step-num">' + (i + 1) + '</span></span>' +
+        '<h3>' + e(s[1]) + '</h3><p>' + e(s[2]) + '</p></li>';
     }).join('');
     var actions;
     if (state.learner) {
-      actions = '<p>Selamat kembali, <strong>' + e(fullName()) + '</strong>.</p>' +
-        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/kursus">Teruskan Kursus</a>' +
+      actions = '<div class="greeting-card"><span class="avatar" aria-hidden="true">' + e(initials()) + '</span>' +
+        '<p>Selamat kembali, <strong>' + e(fullName()) + '</strong>.</p></div>' +
+        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/kursus">Teruskan Kursus ' + icon('arrow') + '</a>' +
         '<button type="button" class="btn-link" id="reset-btn">Bukan anda? Mula semula</button></div>';
     } else {
       actions = (justSignedOut ? '<div class="alert alert-success" role="status">Anda telah keluar. Maklumat anda tidak lagi dipaparkan pada peranti ini.</div>' : '') +
-        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/daftar">Daftar Sekarang</a></div>' +
-        '<p class="muted small">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.</p>';
+        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/daftar">Daftar Sekarang ' + icon('arrow') + '</a></div>' +
+        '<p class="hero-note">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.</p>';
     }
     var resumeCard = state.learner ? '' :
-      '<section class="container" id="sambung-semula"><div class="card resume-card"><h2>Sambung Semula</h2>' +
-      '<p>' + RESUME_DRAFT_NOTE + '</p></div></section>';
+      '<section class="section" id="sambung-semula"><div class="container"><div class="card resume-card">' +
+      '<div class="resume-copy"><span class="resume-icon">' + icon('refresh') + '</span><h2>Sambung Semula</h2>' +
+      '<p class="muted">Dalam portal sebenar, anda boleh menyambung kemajuan, kuiz dan sijil anda dengan e-mel anda sahaja.</p></div>' +
+      '<div class="resume-body"><p class="alert alert-info">' + RESUME_DRAFT_NOTE + '</p></div>' +
+      '</div></div></section>';
     setPage('', siteHeader() +
-      '<main><section class="hero"><div class="container">' +
+      '<main class="landing"><section class="hero">' + BLOBS +
+      '<div class="container hero-grid"><div class="hero-copy">' +
       '<p class="eyebrow">Kursus Dalam Talian NADI</p>' +
       '<h1>' + e(COURSE.title) + '</h1>' +
+      '<span class="dots" aria-hidden="true"></span>' +
       '<p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri. ' +
       'Lengkapkan kelima-lima modul dan lulus kuiz di hujung setiap modul dengan markah sekurang-kurangnya ' + QUIZ.passMark +
       '% untuk muat turun sijil penyelesaian anda.</p>' + actions +
-      '</div></section>' + resumeCard +
-      '<section class="container"><h2>Kandungan Kursus</h2><ol class="section-list">' + list + '</ol></section></main>');
+      '<ul class="stat-strip">' +
+      '<li><span class="stat-num">' + moduleCount + '</span> <span class="stat-label">modul</span></li>' +
+      '<li><span class="stat-num">' + QUIZ_LESSONS.length + '</span> <span class="stat-label">kuiz</span></li>' +
+      '<li><span class="stat-num">' + QUIZ.passMark + '%</span> <span class="stat-label">markah lulus</span></li>' +
+      '<li><span class="stat-num stat-icon">' + icon('award') + '</span> <span class="stat-label">sijil percuma</span></li>' +
+      '</ul></div>' +
+      '<div class="hero-art"><div class="hero-mascot-wrap"><img class="hero-mascot" src="assets/img/mascot-wave-640.webp"' +
+      ' srcset="assets/img/mascot-wave-320.webp 320w, assets/img/mascot-wave-640.webp 640w"' +
+      ' sizes="(min-width: 900px) 360px, 220px" width="640" height="589" alt="Maskot harimau robot NADI"></div>' +
+      partners() + '</div></div></section>' +
+      '<section class="section steps-section" aria-labelledby="cara-heading"><div class="container">' +
+      '<div class="section-head"><h2 id="cara-heading">Cara ia berfungsi</h2><span class="dots" aria-hidden="true"></span></div>' +
+      '<ol class="steps">' + steps + '</ol></div></section>' +
+      resumeCard +
+      '<section class="section modules-section" aria-labelledby="kandungan-heading"><div class="container">' +
+      '<div class="section-head"><h2 id="kandungan-heading">Kandungan Kursus</h2><span class="dots" aria-hidden="true"></span></div>' +
+      '<ol class="module-grid">' + modules + '</ol></div></section></main>' + siteFooter());
     var reset = document.getElementById('reset-btn');
     if (reset) reset.addEventListener('click', signOut);
     justSignedOut = false;
@@ -437,11 +531,25 @@
     ['first_name', 'Nama Pertama', 'text', 'maxlength="100" autocomplete="given-name"'],
     ['last_name', 'Nama Akhir', 'text', 'maxlength="100" autocomplete="family-name"'],
     ['age', 'Umur', 'number', 'min="5" max="120" step="1" inputmode="numeric"'],
-    ['email', 'E-mel', 'email', 'maxlength="190" autocomplete="email"'],
     ['phone', 'Nombor Telefon', 'tel', 'maxlength="20" autocomplete="tel"'],
+    ['email', 'E-mel', 'email', 'maxlength="190" autocomplete="email"'],
     ['address', 'Alamat', 'text', 'maxlength="255" autocomplete="street-address"'],
     ['occupation', 'Pekerjaan', 'text', 'maxlength="100" autocomplete="organization-title"']
   ];
+  // Fields that share a row on wider screens (pairs are adjacent above, as in views/register.php).
+  var HALF_FIELDS = { first_name: true, last_name: true, age: true, phone: true };
+
+  // Navy brand panel beside the form (views/auth-brand.php). The draft cannot resume by e-mail,
+  // so its second point says what it does instead.
+  function authBrand() {
+    return '<aside class="auth-brand">' + BLOBS + '<div class="auth-brand-inner">' +
+      '<p class="auth-kicker">Kursus Dalam Talian NADI</p>' +
+      '<p class="auth-brand-title">Belajar AI, langkah demi langkah</p><ul class="auth-points">' +
+      '<li><span class="auth-point-icon">' + icon('gift') + '</span><span><strong>Percuma</strong> Semua modul, kuiz dan sijil.</span></li>' +
+      '<li><span class="auth-point-icon">' + icon('mail') + '</span><span><strong>Tiada kata laluan</strong> Hanya isi maklumat asas anda.</span></li>' +
+      '<li><span class="auth-point-icon">' + icon('award') + '</span><span><strong>Sijil digital</strong> Muat turun PDF selepas lulus kesemua kuiz.</span></li>' +
+      '</ul><img class="auth-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294"></div></aside>';
+  }
 
   // Same rules and messages as src/validation.php.
   function validateRegistration(input) {
@@ -471,28 +579,29 @@
     var hasErrors = Object.keys(errors).length > 0;
     var fields = FIELDS.map(function (f) {
       var name = f[0];
-      return '<div class="field' + (errors[name] ? ' has-error' : '') + '">' +
+      return '<div class="field' + (HALF_FIELDS[name] ? ' field-half' : '') + (errors[name] ? ' has-error' : '') + '">' +
         '<label for="f-' + name + '">' + e(f[1]) + ' <span class="req">*</span></label>' +
         '<input id="f-' + name + '" name="' + name + '" type="' + f[2] + '" value="' + e(old[name]) + '" required ' + f[3] + '>' +
-        (errors[name] ? '<p class="field-error">' + e(errors[name]) + '</p>' : '') +
+        (errors[name] ? '<p class="field-error">' + icon('alert') + e(errors[name]) + '</p>' : '') +
         '</div>';
     }).join('');
     setPage('Pendaftaran', siteHeader() +
-      '<main class="container narrow"><div class="card">' +
+      '<main class="auth-shell"><div class="auth-grid">' + authBrand() +
+      '<div class="card auth-card">' +
       '<h1>Pendaftaran Peserta</h1>' +
       '<p class="muted">Isi maklumat di bawah untuk mula belajar. Nama anda akan dicetak pada sijil seperti yang ditulis di sini.</p>' +
       '<div class="alert alert-info" id="resume-draft-note">' + RESUME_DRAFT_NOTE + '</div>' +
       (hasErrors ? '<div class="alert alert-error" role="alert">Sila betulkan ralat di bawah.</div>' : '') +
-      '<form class="form" id="register-form" novalidate>' + fields +
+      '<form class="form" id="register-form" novalidate><div class="form-grid">' + fields + '</div>' +
       '<div class="field field-check"><label for="f-remember">' +
       '<input id="f-remember" name="remember" type="checkbox" value="1"' + (remember ? ' checked' : '') + '> ' +
       'Ingat saya pada peranti ini selama 30 hari</label>' +
-      '<p class="muted small field-help">Tandakan hanya jika ini telefon atau komputer anda sendiri. ' +
+      '<p class="muted small field-help">' + icon('shield') + 'Tandakan hanya jika ini telefon atau komputer anda sendiri. ' +
       'Di komputer awam atau dikongsi (contohnya di pusat komuniti atau kafe), biarkan kosong: ' +
       'tekan "Selesai / Keluar" sebelum meninggalkan komputer. Menutup pelayar sahaja tidak ' +
       'semestinya mengeluarkan anda. Anda juga akan dikeluarkan selepas 30 minit tanpa aktiviti.</p></div>' +
-      '<button type="submit" class="btn btn-primary btn-block">Hantar &amp; Mula Kursus</button>' +
-      '</form></div></main>');
+      '<button type="submit" class="btn btn-primary btn-lg btn-block">Hantar &amp; Mula Kursus ' + icon('arrow') + '</button>' +
+      '</form></div></div></main>' + siteFooter());
     document.getElementById('register-form').addEventListener('submit', function (ev) {
       ev.preventDefault();
       var input = {};
@@ -519,8 +628,13 @@
   function renderCourse(params) {
     var lesson = params.lesson ? lessonByKey(params.lesson) : null;
     if (params.lesson && !lesson) {
-      setPage('Ralat', siteHeader() + '<main class="container narrow"><div class="card"><h1>Ralat</h1>' +
-        '<p>Pelajaran tidak dijumpai.</p><p><a href="#/kursus">Kembali ke kursus</a></p></div></main>');
+      // Styled like views/error.php (the portal answers 404 here).
+      setPage('Ralat', siteHeader() + '<main class="container narrow page-pad"><div class="card error-card">' +
+        '<div class="error-art" aria-hidden="true"><img class="error-blob" src="assets/img/blob-amber.svg" alt="" width="425" height="309">' +
+        '<span class="error-code">404</span>' +
+        '<img class="error-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294"></div>' +
+        '<h1>Ralat</h1><p>Pelajaran tidak dijumpai.</p>' +
+        '<p><a class="btn btn-primary btn-lg" href="#/kursus">' + icon('back') + 'Kembali ke kursus</a></p></div></main>' + siteFooter());
       return;
     }
     var passed = passedSet();
@@ -542,6 +656,7 @@
       var sLessons = sectionLessons(s.key);
       var sDone = sLessons.filter(function (l) { return done[l.key]; }).length;
       var sLocked = sLessons.length > 0 && lockReason(sLessons[0], done, passed) !== null;
+      var sComplete = sLessons.length > 0 && sDone === sLessons.length;
       var rows = sLessons.map(function (l) {
         var isDone = !!done[l.key];
         var isCurrent = l.key === lesson.key;
@@ -550,18 +665,20 @@
         return '<li class="lesson-row' + (isCurrent ? ' is-current' : '') + (isDone ? ' is-done' : '') + (isLocked ? ' is-locked' : '') +
           '" data-title="' + e(l.title) + '">' +
           '<a href="' + courseHref(l.key) + '"' + (isCurrent ? ' aria-current="page"' : '') + '>' +
-          '<span class="lesson-tick" aria-hidden="true">' + (isDone ? '&#10003;' : (isLocked ? '&#128274;' : '')) + '</span>' +
+          '<span class="lesson-tick" aria-hidden="true">' + (isDone ? icon('check') : (isLocked ? icon('lock') : '')) + '</span>' +
           '<span class="lesson-meta"><span class="lesson-title">' + e(l.title) + '</span>' +
-          '<span class="lesson-label">' + e(lessonLabel(l)) + '</span>' +
+          '<span class="lesson-tags"><span class="lesson-label">' + icon(l.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(l)) + '</span>' +
           (l.type === 'quiz' ? '<span class="lesson-status' + (isPassed ? ' is-pass' : '') + '">' + (isPassed ? 'LULUS' : 'BELUM LULUS') + '</span>' : '') +
-          '</span>' +
+          '</span></span>' +
           (isDone ? '<span class="sr-only">(selesai)</span>' : '') +
           (isLocked ? '<span class="sr-only">(dikunci)</span>' : '') + '</a></li>';
       }).join('');
-      return '<details class="sidebar-section" data-section="' + e(s.key) + '"' + (s.key === lesson.sectionKey ? ' open' : '') + '>' +
+      return '<details class="sidebar-section' + (sComplete ? ' is-complete' : '') + (sLocked ? ' is-section-locked' : '') +
+        '" data-section="' + e(s.key) + '"' + (s.key === lesson.sectionKey ? ' open' : '') + '>' +
         '<summary><span class="section-title">' + e(s.title) +
-        (sLocked ? '<span class="section-lock" aria-hidden="true">&#128274;</span><span class="sr-only">(dikunci)</span>' : '') + '</span>' +
-        '<span class="section-count">' + sDone + '/' + s.lessons.length + '</span></summary>' +
+        (sLocked ? '<span class="section-lock" aria-hidden="true">' + icon('lock') + '</span><span class="sr-only">(dikunci)</span>' : '') + '</span>' +
+        '<span class="section-count">' + sDone + '/' + s.lessons.length + '</span>' +
+        '<span class="section-chevron" aria-hidden="true"></span></summary>' +
         '<ul class="lesson-list">' + rows + '</ul></details>';
     }).join('');
 
@@ -571,33 +688,55 @@
 
     document.body.className = 'course-page';
     setPage(lesson.title,
-      '<header class="topbar"><a class="topbar-home" href="#/">&larr; Pergi ke Laman Utama</a>' +
-      '<a class="topbar-logo" href="#/"><img src="assets/img/logo.svg" alt="NADI" height="32"></a>' +
-      '<div class="topbar-right"><span class="topbar-user">' + e(fullName()) + '</span>' +
+      '<header class="topbar"><div class="topbar-left">' +
+      '<button type="button" class="sidebar-toggle" id="sidebar-toggle" aria-controls="course-sidebar" aria-expanded="false">' +
+      icon('list') + '<span class="sidebar-toggle-text">Kandungan</span><span class="sidebar-toggle-pct">' + percent + '%</span></button>' +
+      '<a class="topbar-home" href="#/">' + icon('home', 'topbar-home-icon') + '<span class="topbar-home-text">&larr; Pergi ke Laman Utama</span></a></div>' +
+      '<a class="topbar-logo" href="#/"><img src="assets/img/logo.svg" alt="NADI" width="96" height="32"></a>' +
+      '<div class="topbar-right"><span class="avatar avatar-sm" aria-hidden="true">' + e(initials()) + '</span>' +
+      '<span class="topbar-user">' + e(fullName()) + '</span>' +
       '<button type="button" class="btn btn-outline btn-sm" id="topbar-signout-btn">Selesai / Keluar</button></div></header>' +
-      '<div class="course-layout"><aside class="sidebar">' +
+      '<div class="course-layout"><aside class="sidebar" id="course-sidebar" aria-label="Kandungan kursus">' +
       '<h2 class="sidebar-title">' + e(COURSE.title) + '</h2>' +
-      '<div class="progress"><div class="progress-text">' + percent + '% selesai</div>' +
+      '<div class="progress' + (percent >= 100 ? ' is-complete' : '') + '"><div class="progress-text">' + percent + '% selesai</div>' +
       '<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + percent + '">' +
       '<span style="width: ' + percent + '%"></span></div></div>' +
-      '<input type="search" id="lesson-search" class="sidebar-search" placeholder="Cari mengikut tajuk pelajaran" aria-label="Cari mengikut tajuk pelajaran">' +
+      '<div class="search-field">' + icon('search', 'search-icon') +
+      '<input type="search" id="lesson-search" class="sidebar-search" placeholder="Cari mengikut tajuk pelajaran" aria-label="Cari mengikut tajuk pelajaran"></div>' +
       '<nav class="sidebar-sections">' + sidebar + '</nav></aside>' +
+      '<button type="button" class="sidebar-backdrop" aria-label="Tutup kandungan kursus" tabindex="-1"></button>' +
       '<main class="content">' + main + '</main></div>');
 
     document.getElementById('topbar-signout-btn').addEventListener('click', signOut);
     bindSearch();
+    bindDrawer();
     if (lock) return;
     if (lesson.type === 'presentation') bindViewer(lesson, slide, slideCount);
     else bindQuiz(lesson);
   }
 
   // A locked lesson (the portal answers 403 with this card).
+  // Lesson title with its section title as eyebrow (views/course.php .lesson-heading).
+  function lessonHeading(lesson) {
+    return '<div class="lesson-heading"><p class="lesson-eyebrow">' + e(COURSE.sections[sectionIndex(lesson.sectionKey)].title) + '</p>' +
+      '<h1>' + e(lesson.title) + '</h1></div>';
+  }
+  function lessonLabelHtml(lesson) {
+    return '<span class="lesson-label">' + icon(lesson.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(lesson)) + '</span>';
+  }
+
   function lockHtml(lesson, lock) {
-    return '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
-      '<span class="lesson-label">' + e(lessonLabel(lesson)) + '</span></div>' +
-      '<div class="card quiz-gate" id="lock-card"><p class="alert alert-warning">' + e(lock.message) + '</p><ul>' +
-      lock.links.map(function (m) { return '<li><a href="' + courseHref(m.key) + '">' + e(m.title) + '</a></li>'; }).join('') +
-      '</ul></div>';
+    return '<div class="lesson-header">' + lessonHeading(lesson) + lessonLabelHtml(lesson) + '</div>' +
+      '<div class="card quiz-gate lock-card" id="lock-card">' +
+      '<div class="lock-art" aria-hidden="true"><img class="lock-blob" src="assets/img/blob-amber.svg" alt="" width="425" height="309">' +
+      '<span class="lock-icon">' + icon('lock') + '</span>' +
+      '<img class="lock-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294"></div>' +
+      '<div class="lock-body"><h2 class="lock-title">Belum dibuka</h2>' +
+      '<p class="alert alert-warning">' + e(lock.message) + '</p><ul class="lock-links">' +
+      lock.links.map(function (m) {
+        return '<li><a class="lock-link" href="' + courseHref(m.key) + '"><span>' + e(m.title) + '</span>' + icon('arrow') + '</a></li>';
+      }).join('') +
+      '</ul></div></div>';
   }
 
   function presentationHtml(lesson, slide, slideCount) {
@@ -609,15 +748,18 @@
           : '<h2>' + e(s.title) + '</h2><p>' + e(s.body) + '</p>') +
         '</article>';
     }).join('');
-    return '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
-      '<button type="button" class="btn btn-outline" id="fullscreen-btn">Skrin Penuh</button></div>' +
-      '<div class="viewer" id="viewer"><div class="slides">' + slides + '</div>' +
-      '<div class="viewer-bar">' +
-      '<a class="btn btn-nav" id="prev-btn">&lsaquo; SEBELUM</a>' +
+    return '<div class="lesson-header">' + lessonHeading(lesson) +
+      '<button type="button" class="btn btn-outline btn-fullscreen" id="fullscreen-btn">' + icon('expand') + 'Skrin Penuh</button></div>' +
+      '<div class="viewer" id="viewer" style="--slide-progress: ' + (Math.round(slide * 10000 / slideCount) / 100) + '%">' +
+      '<div class="slide-progress" aria-hidden="true"><span></span></div>' +
+      '<div class="slides">' + slides + '</div>' +
+      '<div class="viewer-bar"><div class="viewer-nav">' +
+      '<a class="btn btn-nav" id="prev-btn">' + icon('prev') + 'SEBELUM</a>' +
       '<span class="slide-counter" id="slide-counter">' + slide + '/' + slideCount + '</span>' +
-      '<a class="btn btn-nav" id="next-btn">SETERUSNYA &rsaquo;</a>' +
+      '<a class="btn btn-nav" id="next-btn">SETERUSNYA' + icon('next') + '</a></div>' +
       '<form class="complete-form" id="complete-form">' +
-      '<button type="submit" class="btn btn-primary" id="complete-btn">LENGKAP &amp; TERUSKAN</button></form>' +
+      '<button type="submit" class="btn btn-primary" id="complete-btn">LENGKAP &amp; TERUSKAN</button>' +
+      '<span class="complete-hint">Sampai ke slaid terakhir untuk teruskan</span></form>' +
       '</div></div>';
   }
 
@@ -648,6 +790,7 @@
       setLink(prevBtn, n > 1, n - 1);
       setLink(nextBtn, n < count, n + 1);
       completeBtn.disabled = n !== count;
+      viewer.style.setProperty('--slide-progress', (n * 100 / count) + '%');
       if (window.history && window.history.replaceState) window.history.replaceState(null, '', courseHref(lesson.key, n));
     }
     prevBtn.addEventListener('click', function (ev) { ev.preventDefault(); show(current - 1); });
@@ -704,13 +847,48 @@
     });
   }
 
+  // Below 960px the sidebar is an off-canvas drawer (CSS, only under html.js). Same behaviour as the
+  // Drawer block in public/assets/js/course.js. render() resets body.className, so a route change closes it.
+  var closeDrawer = null; // set while a course page with a drawer is shown (Escape closes it)
+  function bindDrawer() {
+    var toggle = document.getElementById('sidebar-toggle');
+    var drawer = document.getElementById('course-sidebar');
+    closeDrawer = null;
+    if (!toggle || !drawer) return;
+    var backdrop = document.querySelector('.sidebar-backdrop');
+    var search = document.getElementById('lesson-search');
+    function isOpen() { return document.body.classList.contains('sidebar-open'); }
+    function setDrawer(open) {
+      if (open === isOpen()) return;
+      document.body.classList.toggle('sidebar-open', open);
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        if (search) search.focus();
+      } else {
+        toggle.focus();
+      }
+    }
+    toggle.addEventListener('click', function () { setDrawer(!isOpen()); });
+    if (backdrop) backdrop.addEventListener('click', function () { setDrawer(false); });
+    drawer.addEventListener('click', function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest('.lesson-row a') : null;
+      if (link && isOpen()) {
+        document.body.classList.remove('sidebar-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+    closeDrawer = function () { if (isOpen()) setDrawer(false); };
+  }
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && closeDrawer && document.getElementById('course-sidebar')) closeDrawer();
+  });
+
   // ---- Module quizzes ----
   function formatPercent(p) { return String(Math.round(p * 100) / 100); }
 
   function quizHtml(lesson, params, passed) {
     var quiz = quizOf(lesson);
-    var html = '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
-      '<span class="lesson-label">' + e(lessonLabel(lesson)) + '</span></div>';
+    var html = '<div class="lesson-header">' + lessonHeading(lesson) + lessonLabelHtml(lesson) + '</div>';
     var mine = state.attempts.filter(function (a) { return a.quiz === lesson.key; });
     if (state.completion) {
       html += '<div class="alert alert-success">Kursus ini telah selesai. <a href="#/sijil">Lihat sijil anda</a>.</div>';
@@ -721,21 +899,29 @@
       attempt = mine.filter(function (a) { return a.id === id; })[0] || null;
     }
     if (attempt) {
-      html += '<div class="card quiz-result ' + (attempt.passed ? 'is-pass' : 'is-fail') + '">' +
-        '<p class="quiz-score">Markah anda: ' + attempt.correct + '/' + attempt.total + ' (' + formatPercent(attempt.percent) + '%)</p>' +
+      var allPassedNow = allQuizzesPassed(passed);
+      var isFinal = attempt.passed && !state.completion && allPassedNow;
+      var pct = formatPercent(attempt.percent);
+      html += '<div class="card quiz-result ' + (attempt.passed ? 'is-pass' : 'is-fail') + (isFinal ? ' is-final' : '') + '">' +
+        (attempt.passed ? CONFETTI : '') +
+        '<div class="result-hero"><div class="score-ring" style="--score: ' + pct + '" aria-hidden="true"><span>' + Math.round(attempt.percent) + '%</span></div>' +
+        (attempt.passed
+          ? '<img class="result-mascot" src="assets/img/mascot-cheer.webp" alt="" width="315" height="288">'
+          : '<img class="result-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294">') + '</div>' +
+        '<p class="quiz-score">Markah anda: ' + attempt.correct + '/' + attempt.total + ' (' + pct + '%)</p>' +
         '<p class="quiz-status">' + (attempt.passed ? 'LULUS' : 'GAGAL') + '</p>';
       if (!attempt.passed) {
         html += '<p>Markah lulus ialah ' + QUIZ.passMark + '%. Anda boleh mencuba lagi tanpa had.</p>' +
-          '<a class="btn btn-primary" href="' + courseHref(lesson.key) + '">Cuba Lagi</a>';
+          '<a class="btn btn-primary btn-lg" href="' + courseHref(lesson.key) + '">' + icon('refresh') + 'Cuba Lagi</a>';
       } else if (state.completion) {
-        html += '<a class="btn btn-primary" href="#/sijil">Lihat Sijil</a>';
-      } else if (allQuizzesPassed(passed)) {
+        html += '<a class="btn btn-primary btn-lg" href="#/sijil">' + icon('award') + 'Lihat Sijil</a>';
+      } else if (allPassedNow) {
         html += '<p>Tahniah! Tekan butang di bawah untuk menghantar penyelesaian kursus dan mendapatkan sijil anda.</p>' +
-          '<form id="finish-form"><button type="submit" class="btn btn-primary">LENGKAP &amp; TERUSKAN</button></form>';
+          '<form id="finish-form"><button type="submit" class="btn btn-primary btn-lg btn-block">LENGKAP &amp; TERUSKAN</button></form>';
       } else {
         var next = nextLesson(lesson.key);
         html += '<p>Tahniah! Anda lulus kuiz ini.</p>' +
-          (next ? '<a class="btn btn-primary" id="next-lesson-btn" href="' + courseHref(next.key) + '">Teruskan ke ' + e(next.title) + '</a>' : '');
+          (next ? '<a class="btn btn-primary btn-lg" id="next-lesson-btn" href="' + courseHref(next.key) + '">Teruskan ke ' + e(next.title) + '</a>' : '');
       }
       return html + '</div>';
     }
@@ -744,11 +930,12 @@
         return '<label class="quiz-option"><input type="radio" name="' + e(q.id) + '" value="' + e(k) + '" required>' +
           '<span>' + e(q.options[k]) + '</span></label>';
       }).join('');
-      return '<fieldset class="quiz-question"><legend>' + (qi + 1) + '. ' + e(q.text) + '</legend>' + opts + '</fieldset>';
+      return '<fieldset class="quiz-question"><legend><span class="q-num">' + (qi + 1) + '<span class="q-dot">.</span></span> ' + e(q.text) + '</legend>' +
+        '<div class="quiz-options">' + opts + '</div></fieldset>';
     }).join('');
     return html + '<form class="card quiz-form" id="quiz-form" data-quiz="' + e(lesson.key) + '">' +
-      '<p class="muted">Markah lulus: ' + QUIZ.passMark + '% &middot; Percubaan ke-' + (mine.length + 1) + '</p>' +
-      qs + '<button type="submit" class="btn btn-primary">Hantar Jawapan</button></form>';
+      '<p class="quiz-meta">Markah lulus: ' + QUIZ.passMark + '% &middot; Percubaan ke-' + (mine.length + 1) + '</p>' +
+      qs + '<button type="submit" class="btn btn-primary btn-lg quiz-submit">Hantar Jawapan ' + icon('arrow') + '</button></form>';
   }
 
   function bindQuiz(lesson) {
@@ -790,23 +977,27 @@
   function renderCertificate() {
     var c = state.completion;
     setPage('Sijil', siteHeader() +
-      '<main class="container narrow"><div class="card certificate-card">' +
-      '<h1>Tahniah!</h1>' +
-      '<p>Anda telah berjaya menamatkan kursus ini. Sijil anda sudah sedia untuk dimuat turun.</p>' +
+      '<main class="cert-page"><section class="celebrate">' + BLOBS + CONFETTI +
+      '<div class="container celebrate-inner">' +
+      '<img class="celebrate-mascot" src="assets/img/mascot-cheer.webp" alt="" width="315" height="288">' +
+      '<div class="celebrate-copy"><p class="eyebrow">Kursus selesai</p><h1>Tahniah!</h1>' +
+      '<p class="lead">Anda telah berjaya menamatkan kursus ini. Sijil anda sudah sedia untuk dimuat turun.</p></div></div></section>' +
+      '<div class="container cert-container"><div class="card certificate-card">' +
+      '<div class="ticket"><p class="ticket-kicker">' + icon('award') + 'Sijil Penyelesaian</p>' +
       '<dl class="certificate-details">' +
       '<dt>Nama</dt><dd>' + e(fullName()) + '</dd>' +
       '<dt>Kursus</dt><dd>' + e(COURSE.title) + '</dd>' +
       '<dt>Tarikh</dt><dd>' + e(formatDateMs(c.completedAt)) + '</dd>' +
-      '<dt>No. Sijil</dt><dd>' + e(c.code) + '</dd></dl>' +
+      '<dt>No. Sijil</dt><dd><span class="cert-code">' + e(c.code) + '</span></dd></dl></div>' +
       '<div class="certificate-actions">' +
-      '<button type="button" class="btn btn-primary btn-lg" id="download-btn">Muat Turun Sijil (PDF)</button>' +
+      '<button type="button" class="btn btn-primary btn-lg" id="download-btn">' + icon('download') + 'Muat Turun Sijil (PDF)</button>' +
       '<button type="button" class="btn btn-outline btn-lg" id="signout-btn">Selesai / Keluar</button></div>' +
-      '<p class="muted small">Selepas memuat turun sijil, tekan "Selesai / Keluar" supaya nama, kemajuan dan sijil anda ' +
+      '<p class="alert alert-info">Selepas memuat turun sijil, tekan "Selesai / Keluar" supaya nama, kemajuan dan sijil anda ' +
       'tidak dipaparkan kepada pengguna seterusnya pada peranti ini. Di komputer awam, simpan fail sijil ' +
       'ke telefon atau e-mel anda dan padamkan salinan daripada komputer tersebut.</p>' +
-      '<p class="muted small">Ini sijil contoh daripada draf pratonton. Pengesahan sijil hanya tersedia dalam portal sebenar.</p>' +
-      '<p><a href="' + courseHref(LAST_QUIZ.key) + '">Kembali ke kursus</a></p>' +
-      '</div></main>');
+      '<p class="muted small">' + icon('shield') + 'Ini sijil contoh daripada draf pratonton. Pengesahan sijil hanya tersedia dalam portal sebenar.</p>' +
+      '<p><a class="back-link" href="' + courseHref(LAST_QUIZ.key) + '">' + icon('back') + 'Kembali ke kursus</a></p>' +
+      '</div></div></main>' + siteFooter());
     document.getElementById('signout-btn').addEventListener('click', signOut);
     document.getElementById('download-btn').addEventListener('click', function () {
       if (expireIfIdle() || !state.completion) return go('#/daftar');
