@@ -27,15 +27,55 @@ function pdf_line(FPDF $pdf, float $y, float $h, string $text, string $style, fl
 }
 
 /**
- * Render the certificate (SIJIL PENYERTAAN) as PDF bytes.
- * Wording and images come from content/certificate.php.
+ * Fit the learner's name into $cfg['max_width'] mm.
+ * One line from max_size down to min_size in 1 pt steps; if it still does not fit,
+ * two lines split at the space nearest the middle (or the middle character), shrunk
+ * together from min_size in 0.5 pt steps down to 4 pt.
+ * The same algorithm is in docs/assets/js/app.js (nameLayout).
+ *
+ * @param callable(string, float): float $measure width in mm of $text at $size pt
+ * @return array{size: float, lines: string[]}
+ */
+function certificate_name_layout(callable $measure, string $name, array $cfg): array
+{
+    $max = (float)$cfg['max_width'];
+    for ($size = (float)$cfg['max_size']; $size >= (float)$cfg['min_size']; $size -= 1) {
+        if ($measure($name, $size) <= $max) {
+            return ['size' => $size, 'lines' => [$name]];
+        }
+    }
+
+    $chars = mb_str_split($name);
+    $mid = intdiv(count($chars), 2);
+    $split = null;
+    foreach ($chars as $i => $ch) {
+        if ($ch === ' ' && ($split === null || abs($i - $mid) < abs($split - $mid))) {
+            $split = $i;
+        }
+    }
+    if ($split !== null) {
+        $lines = [implode('', array_slice($chars, 0, $split)), implode('', array_slice($chars, $split + 1))];
+    } else {
+        $lines = [implode('', array_slice($chars, 0, $mid)), implode('', array_slice($chars, $mid))];
+    }
+
+    $size = (float)$cfg['min_size'];
+    while ($size > 4 && max($measure($lines[0], $size), $measure($lines[1], $size)) > $max) {
+        $size -= 0.5;
+    }
+    return ['size' => $size, 'lines' => $lines];
+}
+
+/**
+ * Render the certificate as PDF bytes: the template picture fills the page, the
+ * placeholder is covered, and the name, date and certificate number are printed.
+ * Template and positions come from content/certificate.php.
  *
  * @param array $d first_name, last_name, course_title, date_text, code, issuer
  */
 function render_certificate_pdf(array $d): string
 {
     $cert = require APP_ROOT . '/content/certificate.php';
-    $img = static fn (string $path): string => APP_ROOT . '/public/' . $path;
 
     $pdf = new FPDF('L', 'mm', 'A4');
     $pdf->SetCompression(false);
@@ -45,70 +85,28 @@ function render_certificate_pdf(array $d): string
     $pdf->SetMargins(0, 0, 0);
     $pdf->AddPage();
 
-    $w = $pdf->GetPageWidth();
-    $h = $pdf->GetPageHeight();
-    $blue = [16, 62, 110];
-    $ink = [17, 17, 17];
+    $pdf->Image(APP_ROOT . '/public/' . $cert['template'], 0, 0, $pdf->GetPageWidth(), $pdf->GetPageHeight());
 
-    $pdf->Image($img($cert['background']), 0, 0, $w, $h);
+    $n = $cert['name'];
+    $pdf->SetFillColor(...$n['patch_color']);
+    $pdf->Rect($n['patch'][0], $n['patch'][1], $n['patch'][2], $n['patch'][3], 'F');
 
-    // Logos: 18 mm high, centred.
-    $logos = $img($cert['logos']);
-    [$lw, $lh] = getimagesize($logos);
-    $logoW = 18 * $lw / $lh;
-    $pdf->Image($logos, ($w - $logoW) / 2, 9, $logoW, 18);
-
-    $pdf->SetTextColor(...$ink);
-    pdf_line($pdf, 34, 14, $cert['title'], 'B', 34);
-    pdf_line($pdf, 54, 6, $cert['intro'], '', 12);
-
-    // Learner name: shrink until it fits 240 mm.
-    $name = pdf_text($d['first_name'] . ' ' . $d['last_name']);
-    $size = 26;
-    $pdf->SetFont('Helvetica', 'B', $size);
-    while ($size > 14 && $pdf->GetStringWidth($name) > 240) {
-        $size--;
+    $measure = static function (string $text, float $size) use ($pdf): float {
         $pdf->SetFont('Helvetica', 'B', $size);
-    }
-    $pdf->SetTextColor(...$blue);
-    $pdf->SetXY(0, 62);
-    $pdf->Cell($w, 12, $name, 0, 0, 'C');
-
-    $pdf->SetTextColor(...$ink);
-    pdf_line($pdf, 88, 6, $cert['completed'], '', 12);
-    $pdf->SetTextColor(...$blue);
-    pdf_line($pdf, 96, 9, $cert['program'], 'B', 18);
-    $pdf->SetTextColor(...$ink);
-    pdf_line($pdf, 114, 6, $cert['focus'], 'B', 11);
-
-    // Summary line: normal, bold, normal pieces measured and printed side by side.
-    $styles = ['', 'B', ''];
-    $widths = [];
-    foreach ($cert['summary'] as $i => $part) {
-        $pdf->SetFont('Helvetica', $styles[$i % 3], 10.5);
-        $widths[$i] = $pdf->GetStringWidth(pdf_text($part));
-    }
-    $pdf->SetXY(($w - array_sum($widths)) / 2, 122);
-    foreach ($cert['summary'] as $i => $part) {
-        $pdf->SetFont('Helvetica', $styles[$i % 3], 10.5);
-        $pdf->Cell($widths[$i], 5, pdf_text($part), 0, 0, 'L');
-    }
-    foreach ($cert['modules'] as $i => $line) {
-        pdf_line($pdf, 128 + 6 * $i, 5, $line, '', 10.5);
+        return $pdf->GetStringWidth(pdf_text($text));
+    };
+    $layout = certificate_name_layout($measure, $d['first_name'] . ' ' . $d['last_name'], $n);
+    $lineH = $layout['size'] * 0.3528 * 1.15;
+    $top = $n['center_y'] - count($layout['lines']) * $lineH / 2;
+    $pdf->SetTextColor(...$n['color']);
+    foreach ($layout['lines'] as $i => $line) {
+        pdf_line($pdf, $top + $i * $lineH, $lineH, $line, 'B', $layout['size']);
     }
 
-    // Signature.
-    $pdf->SetDrawColor(...$ink);
-    $pdf->SetLineWidth(0.3);
-    $pdf->Line(116, 178, 181, 178);
-    pdf_line($pdf, 180, 5, $cert['signatory']['name'], 'B', 10);
-    pdf_line($pdf, 185, 5, $cert['signatory']['title'], '', 10);
-    pdf_line($pdf, 190, 5, $cert['signatory']['org'], '', 10);
-
-    $pdf->Image($img($cert['badge']), 212, 152, 28);
-
-    pdf_line($pdf, 186, 5, $cert['date_label'] . ': ' . $d['date_text'], '', 9, 18);
-    pdf_line($pdf, 191, 5, $cert['code_label'] . ': ' . $d['code'], '', 9, 18);
+    $t = $cert['details'];
+    $pdf->SetTextColor(...$t['color']);
+    pdf_line($pdf, $t['y'], $t['line_height'], $cert['date_label'] . ': ' . $d['date_text'], '', $t['size'], $t['x']);
+    pdf_line($pdf, $t['y'] + $t['line_height'], $t['line_height'], $cert['code_label'] . ': ' . $d['code'], '', $t['size'], $t['x']);
 
     return $pdf->Output('S');
 }

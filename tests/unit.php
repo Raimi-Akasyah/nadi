@@ -156,10 +156,7 @@ check(strncmp($pdf, '%PDF', 4) === 0, 'certificate PDF starts with %PDF');
 check(strpos($pdf, 'Ali Ahmad') !== false, "certificate PDF contains 'Ali Ahmad'");
 check(strpos($pdf, '23 November 2026') !== false, "certificate PDF contains '23 November 2026'");
 check(strpos($pdf, 'NADI-0123456789') !== false, 'certificate PDF contains the code');
-check(strpos($pdf, 'SIJIL PENYERTAAN') !== false, "certificate PDF contains 'SIJIL PENYERTAAN'");
-check(strpos($pdf, 'AI FOR COMMUNITY@NADI') !== false, "certificate PDF contains 'AI FOR COMMUNITY@NADI'");
-check(strpos($pdf, 'Thanaselan Rajendran') !== false, 'certificate PDF contains the signatory name');
-check(substr_count($pdf, '/Subtype /Image') >= 3, 'certificate PDF embeds background, logos and badge images');
+check(substr_count($pdf, '/Subtype /Image') >= 1, 'certificate PDF embeds the template image');
 $longLast = str_repeat('Abcdefghij', 6);
 $pdf = render_certificate_pdf([
     'first_name' => 'Ali', 'last_name' => $longLast, 'course_title' => $course->title(),
@@ -167,6 +164,27 @@ $pdf = render_certificate_pdf([
 ]);
 check(strpos($pdf, 'Ali ' . $longLast) !== false, 'certificate PDF contains a 60-character last name in full');
 check(pdf_text('Caf' . "\u{00E9}") === "Caf\xE9", 'pdf_text converts UTF-8 to windows-1252');
+$certCfg = require APP_ROOT . '/content/certificate.php';
+$fpdf = new FPDF('L', 'mm', 'A4');
+$measure = static function (string $text, float $size) use ($fpdf): float {
+    $fpdf->SetFont('Helvetica', 'B', $size);
+    return $fpdf->GetStringWidth(pdf_text($text));
+};
+$layout = certificate_name_layout($measure, 'Ali Ahmad', $certCfg['name']);
+check($layout['lines'] === ['Ali Ahmad'] && $layout['size'] === 26.0, 'certificate_name_layout: Ali Ahmad -> one line at 26 pt');
+$huge = str_repeat('a', 100) . ' ' . str_repeat('b', 100);
+$layout = certificate_name_layout($measure, $huge, $certCfg['name']);
+$fits = true;
+foreach ($layout['lines'] as $line) {
+    $fits = $fits && $measure($line, $layout['size']) <= $certCfg['name']['max_width'];
+}
+check(count($layout['lines']) <= 2 && $fits, 'certificate_name_layout: 201-character name fits on at most 2 lines of 250 mm');
+check(implode(' ', $layout['lines']) === $huge, 'certificate_name_layout: every character of the long name is kept');
+$tplPublic = APP_ROOT . '/public/' . $certCfg['template'];
+$tplDocs = APP_ROOT . '/docs/' . $certCfg['template'];
+check(is_file($tplPublic) && is_file($tplDocs) && sha1_file($tplPublic) === sha1_file($tplDocs), 'certificate template.png in public/ and docs/ is identical');
+[$tw, $th] = getimagesize($tplPublic);
+check(abs(($tw / $th) / (297 / 210) - 1) < 0.01, 'certificate template has the A4 landscape aspect ratio (within 1%)');
 
 // --- Sambung Semula: e-mail validation and rate limit ---
 check(validate_resume_email(['email' => '  a@example.com '])  === ['a@example.com', null], 'resume e-mail is trimmed and accepted');

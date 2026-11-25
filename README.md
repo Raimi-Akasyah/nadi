@@ -13,11 +13,11 @@ Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 | `public/` | The web root: page scripts (`index.php`, `register.php`, `course.php`, `quiz-submit.php`, `complete.php`, `certificate.php`, `certificate-download.php`, `verify.php`, ...) and `assets/` (CSS, JS, logo). |
 | `src/` | Bootstrap, database connection, helpers, validation, repositories (all SQL), `Course.php`, `Quiz.php` (grading), `CertificatePdf.php`. |
 | `views/` | HTML templates. |
-| `content/` | `course.php` (sections, lessons, slides), `quiz.php` (questions, answers, pass mark) and `certificate.php` (certificate wording and image paths). |
+| `content/` | `course.php` (sections, lessons, slides), `quiz.php` (questions, answers, pass mark) and `certificate.php` (certificate template path and the positions of the name, date and certificate number). |
 | `config/` | `config.example.php`. Your real `config.php` goes here and is not committed. |
 | `sql/` | `schema.sql`, imported once with phpMyAdmin. |
 | `lib/fpdf/` | FPDF 1.86, used to build the certificate PDF. |
-| `tests/` | `lint.ps1`, `unit.php`, `e2e.php`, `docs-check.mjs` (headless-browser check of `docs/`). |
+| `tests/` | `lint.ps1`, `unit.php`, `e2e.php`, `docs-check.mjs` (headless-browser check of `docs/`), `render-cert.php` (sample certificates for a visual check). |
 
 Every folder except `public/` has an `.htaccess` with `Require all denied`, as a second guard in case the document root is not changed.
 
@@ -67,7 +67,7 @@ The course structure, slide titles and quiz questions in `docs/assets/js/app.js`
 - **Quiz questions:** edit `content/quiz.php`. Each question has an `id`, `text`, four `options` (`a` to `d`) and the correct `answer`. Correct answers are never sent to the browser.
 - **Pass mark:** change `pass_mark` in `content/quiz.php` (default 75). A learner passes when `correct * 100 / total >= pass_mark`.
 - **Which modules unlock the quiz:** `quiz_requires` in `content/course.php`.
-- **Certificate:** the design follows the "SIJIL PENYERTAAN" sample in the course deck. The wording (title, program, modules, signatory, labels) and the image paths are in `content/certificate.php`. The images are `background.png`, `logos.png` and `badge.png` in `public/assets/certificate/`; replace those PNGs to change the artwork. The static preview uses copies in `docs/assets/certificate/` and a copy of the text in `CERT` in `docs/assets/js/app.js`, so update both. `certificate.issuer` in `config/config.php` is now only the PDF author. The layout is in `src/CertificatePdf.php`.
+- **Certificate:** the whole design (logos, "SIJIL PENYERTAAN", wording, signature, badge) is one picture, `public/assets/certificate/template.png`, drawn over the full A4 landscape page. The PDF covers the "[ NAMA PESERTA ]" placeholder with a white rectangle and prints the learner's name there (shrunk, or split over two lines, when it is long), and prints the date and certificate number at the bottom left. All positions are in millimetres in `content/certificate.php`. To find a position on a new template, read the pixel position in an image editor and convert it: mm = px × 297 / image width in px. To change the design, replace `template.png` and adjust those numbers. The static preview uses a copy in `docs/assets/certificate/template.png` and a copy of the numbers in `CERT` in `docs/assets/js/app.js`, so update both. The current template is 1123 × 794 px, which is 96 dpi on A4: it looks fine on screen but will be slightly soft when printed. For sharp prints, export the same design at 3508 × 2480 px (300 dpi) and replace both copies; the coordinates in mm stay the same. To check a change, run `& 'C:\xampp 8.2\php\php.exe' tests/render-cert.php <folder>` (writes `cert-php.pdf` and `cert-php-long.pdf`, no database needed) and, for the preview, `node tests/docs-check.mjs` with the environment variable `NADI_CERT_OUT=<folder>` (writes `cert-docs.png` and `cert-docs-long.png`). `certificate.issuer` in `config/config.php` is only the PDF author. The drawing code is in `src/CertificatePdf.php`.
 
 ## Continuing later: Sambung Semula
 

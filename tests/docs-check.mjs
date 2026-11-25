@@ -4,7 +4,7 @@
 // Fails on any console error, uncaught exception or failed request.
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, extname, join, normalize, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -133,7 +133,9 @@ try {
     const out = { hash: location.hash, inSession: !!sessionStorage.getItem('${KEY}'), inLocal: !!localStorage.getItem('${KEY}') };
     out.topbarSignout = !!document.getElementById('topbar-signout-btn');
     for (let n = 1; n <= 5; n++) {
-      await go('#/kursus?lesson=modul-' + n + '-pengenalan&slide=5');
+      await go('#/kursus?lesson=modul-' + n + '-pengenalan&slide=1');
+      const last = document.getElementById('slide-counter').textContent.split('/')[1];
+      await go('#/kursus?lesson=modul-' + n + '-pengenalan&slide=' + last);
       document.getElementById('complete-form').requestSubmit();
       await sleep(150);
     }
@@ -149,7 +151,18 @@ try {
     out.certShowsName = text().includes('Ujian DrafA');
     out.hasSignout = !!document.getElementById('signout-btn');
     document.getElementById('download-btn').click();
-    await sleep(200);
+    await sleep(500);
+    const RealImage = window.Image;
+    window.Image = function () {
+      const stub = {};
+      Object.defineProperty(stub, 'src', { set() { setTimeout(() => stub.onerror && stub.onerror(), 0); } });
+      return stub;
+    };
+    document.getElementById('download-btn').click();
+    await sleep(300);
+    window.Image = RealImage;
+    const err = document.getElementById('download-error');
+    out.downloadError = !!err && err.textContent.includes('Sijil tidak dapat dijana');
     document.getElementById('signout-btn').click();
     await sleep(200);
     out.afterHash = location.hash;
@@ -164,6 +177,7 @@ try {
   step('A registers without Ingat saya: state in sessionStorage only, course page has Selesai / Keluar',
     a.hash.startsWith('#/kursus') && a.inSession && !a.inLocal && a.topbarSignout, JSON.stringify(a).slice(0, 300));
   step('A completes the course and sees the certificate with Selesai / Keluar', a.certHash === '#/sijil' && a.certShowsName && a.hasSignout, JSON.stringify(a).slice(0, 300));
+  step('certificate download failure shows "Sijil tidak dapat dijana" (no console error)', a.downloadError, JSON.stringify(a).slice(0, 300));
   step('Selesai / Keluar: landing shows "Anda telah keluar", no name, storage cleared',
     a.afterText.includes('Anda telah keluar') && a.afterText.includes('Daftar Sekarang') && !a.afterText.includes('DrafA') && a.storageEmpty,
     a.afterText.slice(0, 200));
@@ -221,6 +235,7 @@ try {
     document.getElementById('next-btn').click();
     await sleep(50);
     const counter = document.getElementById('slide-counter').textContent;
+    while (!document.getElementById('next-btn').classList.contains('is-disabled')) document.getElementById('next-btn').click();
     document.getElementById('complete-form').requestSubmit();
     await sleep(150);
     Date.now = real;
@@ -228,7 +243,7 @@ try {
     return { counter, hash: location.hash, done: !!(s && s.done['modul-4-pengenalan']),
       name: document.getElementById('app').textContent.includes('DrafR') }; // the name is hidden on narrow screens
   `);
-  step('80 minutes reading Modul 4 with slide clicks: not signed out, lesson saved', r.counter === '5/5' && r.done && r.name
+  step('80 minutes reading Modul 4 with slide clicks: not signed out, lesson saved', r.counter === '5/12' && r.done && r.name
     && r.hash.startsWith('#/kursus?lesson=modul-5'), JSON.stringify(r));
 
   await tab.evaluate(helpers + `await register('DrafC', false); return true;`);
@@ -276,6 +291,22 @@ try {
   const y = await tab5.evaluate(`return { t: document.getElementById('app').innerText, empty: !localStorage.getItem('${KEY}') };`);
   step('state saved by the old draft (before Ingat saya) is dropped', !y.t.includes('DrafLama') && y.t.includes('Daftar Sekarang') && y.empty, JSON.stringify(y).slice(0, 200));
   await tab5.close();
+  // Optional: save certificate renders for a visual check (NADI_CERT_OUT=<folder>).
+  if (process.env.NADI_CERT_OUT) {
+    const renders = await tab.evaluate(`
+      const base = { course_title: 'x', date_text: '23 November 2026', code: 'NADI-0123456789', issuer: 'NADI' };
+      const names = [['Ali', 'Ahmad'], ['Siti Nur Aisyah Humaira Binti', 'Mohamad Abdul Rahman Shahrul Nizam Al-Haj Ismail Iskandar Zulkarnain Tengku Sulaiman']];
+      const out = [];
+      for (const [first_name, last_name] of names) {
+        const canvas = await window.NADI_DRAFT.drawCertificate(Object.assign({ first_name, last_name }, base));
+        out.push(canvas.toDataURL('image/png').split(',')[1]);
+      }
+      return out;
+    `);
+    writeFileSync(join(process.env.NADI_CERT_OUT, 'cert-docs.png'), Buffer.from(renders[0], 'base64'));
+    writeFileSync(join(process.env.NADI_CERT_OUT, 'cert-docs-long.png'), Buffer.from(renders[1], 'base64'));
+    console.log('wrote cert-docs.png and cert-docs-long.png to ' + process.env.NADI_CERT_OUT);
+  }
   await tab.close();
 
   step('no console errors, exceptions or failed requests', consoleErrors.length === 0, consoleErrors.join(' | '));
