@@ -69,7 +69,7 @@ function learner_find_for_resume(string $email): ?array
     $stmt = db()->prepare(
         'SELECT l.*,
                 (SELECT COUNT(*) FROM completions c WHERE c.learner_id = l.id) AS resume_completions,
-                (SELECT COUNT(*) FROM quiz_attempts a WHERE a.learner_id = l.id AND a.passed = 1) AS resume_passes,
+                (SELECT COUNT(DISTINCT a.quiz_key) FROM quiz_attempts a WHERE a.learner_id = l.id AND a.passed = 1) AS resume_passes,
                 (SELECT COUNT(*) FROM lesson_progress p WHERE p.learner_id = l.id) AS resume_lessons
          FROM learners l
          WHERE LOWER(l.email) = LOWER(?)

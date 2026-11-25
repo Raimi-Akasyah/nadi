@@ -168,13 +168,13 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                 <?php endif; ?>
 
                 <?php if ($attempt !== null):
-                    $passed = (int)$attempt['passed'] === 1;
+                    $attemptPassed = (int)$attempt['passed'] === 1;
                     $pct = rtrim(rtrim(number_format((float)$attempt['score_percent'], 2, '.', ''), '0'), '.');
                 ?>
-                    <div class="card quiz-result <?= $passed ? 'is-pass' : 'is-fail' ?>">
+                    <div class="card quiz-result <?= $attemptPassed ? 'is-pass' : 'is-fail' ?>">
                         <p class="quiz-score">Markah anda: <?= e($attempt['correct_count']) ?>/<?= e($attempt['total_questions']) ?> (<?= e($pct) ?>%)</p>
-                        <p class="quiz-status"><?= $passed ? 'LULUS' : 'GAGAL' ?></p>
-                        <?php if (!$passed): ?>
+                        <p class="quiz-status"><?= $attemptPassed ? 'LULUS' : 'GAGAL' ?></p>
+                        <?php if (!$attemptPassed): ?>
                             <p>Markah lulus ialah <?= e($quiz['pass_mark']) ?>%. Anda boleh mencuba lagi tanpa had.</p>
                             <a class="btn btn-primary" href="<?= e($lessonUrl($lesson['key'])) ?>">Cuba Lagi</a>
                         <?php elseif ($completion !== null): ?>
