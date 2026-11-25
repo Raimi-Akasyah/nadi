@@ -9,8 +9,8 @@
             <p class="eyebrow">Kursus Dalam Talian NADI</p>
             <h1><?= e($course->title()) ?></h1>
             <p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri.
-                Lengkapkan kelima-lima modul, lulus Kuiz Akhir dengan markah sekurang-kurangnya
-                <?= e($course->quiz()['pass_mark']) ?>%, dan muat turun sijil penyelesaian anda serta-merta.</p>
+                Lengkapkan kelima-lima modul dan lulus kuiz di hujung setiap modul dengan markah sekurang-kurangnya
+                <?= e($course->passMark()) ?>% untuk muat turun sijil penyelesaian anda.</p>
             <?php if ($learner !== null): ?>
                 <p>Selamat kembali, <strong><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></strong>.</p>
                 <div class="hero-actions">

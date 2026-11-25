@@ -12,13 +12,17 @@
  *
  * Keep docs/assets/js/app.js (COURSE) in sync with this file.
  *
- * quiz_requires: section keys whose presentation lessons must be completed before the final quiz opens.
+ * Quiz lessons: ['key' => 'kuiz-modul-N', 'title' => 'Kuiz Modul N', 'type' => 'quiz', 'quiz' => 'modul-N'] where
+ * 'quiz' is a key of 'quizzes' in content/quiz.php. Each module ends with its quiz lesson.
+ *
+ * Unlock order = section order. Sections before the first quiz are always open. A section with a quiz opens
+ * when the quiz of the section before it is passed (the first one is open). A quiz opens when the other lessons
+ * of its section are done. Sections after the last quiz open when every quiz is passed.
  */
 return [
-    'key'           => 'ai-essentials',
-    'title'         => 'Malaysia AWS AI Essentials',
-    'quiz_requires' => ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'],
-    'sections'      => [
+    'key'      => 'ai-essentials',
+    'title'    => 'Malaysia AWS AI Essentials',
+    'sections' => [
         [
             'key'     => 'pengenalan',
             'title'   => 'Pengenalan',
@@ -38,6 +42,7 @@ return [
                     ['title' => 'Apakah Itu Kecerdasan Buatan (AI)?', 'image' => 'assets/slides/page-09.webp'],
                     ['title' => 'AI Bukan Pengganti Kita, Tapi Pembantu Kita', 'image' => 'assets/slides/page-10.webp'],
                 ]],
+                ['key' => 'kuiz-modul-1', 'title' => 'Kuiz Modul 1', 'type' => 'quiz', 'quiz' => 'modul-1'],
             ],
         ],
         [
@@ -50,6 +55,7 @@ return [
                     ['title' => 'Apakah Itu AI Generatif?', 'image' => 'assets/slides/page-13.webp'],
                     ['title' => "'Perangai' Pekerja Baru AI Kita", 'image' => 'assets/slides/page-14.webp'],
                 ]],
+                ['key' => 'kuiz-modul-2', 'title' => 'Kuiz Modul 2', 'type' => 'quiz', 'quiz' => 'modul-2'],
             ],
         ],
         [
@@ -67,6 +73,7 @@ return [
                     ['title' => "Latihan Berkumpulan: Selesaikan Krisis 'Sales Turun' (bisnes.ai)", 'image' => 'assets/slides/page-22.webp'],
                     ['title' => "Latihan Berkumpulan: Selesaikan Krisis 'Sales Turun' (3 Langkah)", 'image' => 'assets/slides/page-23.webp'],
                 ]],
+                ['key' => 'kuiz-modul-3', 'title' => 'Kuiz Modul 3', 'type' => 'quiz', 'quiz' => 'modul-3'],
             ],
         ],
         [
@@ -87,6 +94,7 @@ return [
                     ['title' => 'Langkah 6: Skrip Video Promosi (Prompt KOPI)', 'image' => 'assets/slides/page-34.webp'],
                     ['title' => 'Jom Hasilkan Aplikasi (PartyRock)', 'image' => 'assets/slides/page-35.webp'],
                 ]],
+                ['key' => 'kuiz-modul-4', 'title' => 'Kuiz Modul 4', 'type' => 'quiz', 'quiz' => 'modul-4'],
             ],
         ],
         [
@@ -102,13 +110,7 @@ return [
                     ['title' => 'Kenali 4 Alat AI yang Akan Membantu Anda', 'image' => 'assets/slides/page-41.webp'],
                     ['title' => 'Teruskan Pembelajaran Anda Selepas Bengkel Ini', 'image' => 'assets/slides/page-42.webp'],
                 ]],
-            ],
-        ],
-        [
-            'key'     => 'kuiz-akhir',
-            'title'   => 'Kuiz Akhir',
-            'lessons' => [
-                ['key' => 'kuiz-akhir', 'title' => 'Kuiz Akhir', 'type' => 'quiz'],
+                ['key' => 'kuiz-modul-5', 'title' => 'Kuiz Modul 5', 'type' => 'quiz', 'quiz' => 'modul-5'],
             ],
         ],
         [

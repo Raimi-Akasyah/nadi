@@ -121,16 +121,17 @@ function progress_keys(int $learnerId): array
     return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
-/** Store a graded quiz attempt (result from grade_quiz) and return its id. */
-function attempt_create(int $learnerId, string $courseKey, array $result): int
+/** Store a graded attempt (result from grade_quiz) of one quiz ($quizKey = quiz lesson key) and return its id. */
+function attempt_create(int $learnerId, string $courseKey, string $quizKey, array $result): int
 {
     $stmt = db()->prepare(
-        'INSERT INTO quiz_attempts (learner_id, course_key, correct_count, total_questions, score_percent, passed, answers_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO quiz_attempts (learner_id, course_key, quiz_key, correct_count, total_questions, score_percent, passed, answers_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $learnerId,
         $courseKey,
+        $quizKey,
         (int)$result['correct'],
         (int)$result['total'],
         number_format((float)$result['percent'], 2, '.', ''),
@@ -160,11 +161,20 @@ function attempt_latest_passed(int $learnerId, string $courseKey): ?array
     return $row === false ? null : $row;
 }
 
-function attempt_count(int $learnerId, string $courseKey): int
+/** Number of attempts of one quiz. */
+function attempt_count(int $learnerId, string $courseKey, string $quizKey): int
 {
-    $stmt = db()->prepare('SELECT COUNT(*) FROM quiz_attempts WHERE learner_id = ? AND course_key = ?');
-    $stmt->execute([$learnerId, $courseKey]);
+    $stmt = db()->prepare('SELECT COUNT(*) FROM quiz_attempts WHERE learner_id = ? AND course_key = ? AND quiz_key = ?');
+    $stmt->execute([$learnerId, $courseKey, $quizKey]);
     return (int)$stmt->fetchColumn();
+}
+
+/** @return string[] quiz keys with at least one passed attempt (may include the legacy 'kuiz-akhir') */
+function quiz_passed_keys(int $learnerId, string $courseKey): array
+{
+    $stmt = db()->prepare('SELECT DISTINCT quiz_key FROM quiz_attempts WHERE learner_id = ? AND course_key = ? AND passed = 1');
+    $stmt->execute([$learnerId, $courseKey]);
+    return array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
 function completion_find(int $learnerId, string $courseKey): ?array

@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 // End-to-end test against a running server (needs the DB from config/config.php).
 // Run: & 'C:\xampp 8.2\php\php.exe' tests/e2e.php http://127.0.0.1:8080 [path-to-save-certificate.pdf]
+// The migration step uses the mysql client (MYSQL_BIN, default C:\xampp 8.2\mysql\bin\mysql.exe) and a scratch DB <db>_migtest.
 
 require __DIR__ . '/../src/bootstrap.php';
 
@@ -163,15 +164,19 @@ function step(int $n, string $label, bool $ok, string $detail = ''): void
 }
 
 $course = Course::load();
-$quiz = $course->quiz();
 $courseKey = $course->key();
-$quizKey = $course->quizLesson()['key'];
+/** @var array<int, array> $quizzes module number => quiz (title, pass_mark, questions) */
+$quizzes = [];
+for ($n = 1; $n <= 5; $n++) {
+    $quizzes[$n] = $course->quiz('kuiz-modul-' . $n);
+}
+$leakFound = false;
 
 /** Answers with the first $correct questions right and the rest wrong. */
-function answers_with(array $quiz, int $correct): array
+function answers_with(array $questions, int $correct): array
 {
     $out = [];
-    foreach ($quiz['questions'] as $i => $q) {
+    foreach ($questions as $i => $q) {
         if ($i < $correct) {
             $out[$q['id']] = $q['answer'];
         } else {
@@ -182,19 +187,82 @@ function answers_with(array $quiz, int $correct): array
     return $out;
 }
 
-function quiz_post(array $answers): array
+/** True when an open quiz page reveals anything about the correct answers. */
+function quiz_page_leaks(string $html, array $questions): bool
 {
-    $page = http('GET', 'course.php?lesson=kuiz-akhir');
+    foreach ($questions as $q) {
+        if (strpos($html, 'name="answers[' . $q['id'] . ']"') === false) {
+            return true;
+        }
+    }
+    return strpos($html, 'answer"') !== false || strpos($html, 'checked') !== false;
+}
+
+/** Submit answers for one quiz lesson ($quizKey = kuiz-modul-N) on the current device. */
+function quiz_post(string $quizKey, array $answers): array
+{
+    global $leakFound, $course;
+    $page = http('GET', 'course.php?lesson=' . $quizKey);
+    if ($page['status'] === 200 && strpos($page['body'], 'quiz-submit.php') !== false
+        && quiz_page_leaks($page['body'], $course->quiz($quizKey)['questions'])) {
+        $leakFound = true;
+    }
+    // The token is per session; a locked page still has it in the "Selesai / Keluar" form.
     $csrf = csrf_from($page['body']);
     if ($csrf === '') {
-        // The gate page has no form; the token is per session, so take it from a lesson page.
-        $csrf = csrf_from(http('GET', 'course.php?lesson=modul-1-pengenalan')['body']);
+        $csrf = csrf_from(http('GET', 'course.php?lesson=pengenalan')['body']);
     }
-    $fields = ['csrf' => $csrf];
+    $fields = ['csrf' => $csrf, 'quiz' => $quizKey];
     foreach ($answers as $qid => $opt) {
         $fields["answers[$qid]"] = $opt;
     }
     return http('POST', 'quiz-submit.php', $fields);
+}
+
+/** Complete Modul $n's slide lesson and pass Kuiz Modul $n with every answer right. */
+function pass_module(int $n): bool
+{
+    global $quizzes;
+    $ok = complete_lessons(["modul-$n-pengenalan"]);
+    $r = quiz_post("kuiz-modul-$n", answers_with($quizzes[$n]['questions'], count($quizzes[$n]['questions'])));
+    return $ok && $r['status'] === 302 && strpos($r['location'], "course.php?lesson=kuiz-modul-$n&attempt=") === 0;
+}
+
+/** "LULUS" / "BELUM LULUS" shown in the sidebar for the quiz lesson titled $title, or '' when absent. */
+function sidebar_quiz_status(string $html, string $title): string
+{
+    $re = '/data-title="' . preg_quote($title, '/') . '">.*?class="lesson-status[^"]*">([A-Z ]+)</s';
+    return preg_match($re, $html, $m) ? $m[1] : '';
+}
+
+/**
+ * Run SQL (a string, or the contents of a file) with the mysql command-line client against $db ('' = none).
+ * The client is MYSQL_BIN or the XAMPP default; credentials come from config()['db'].
+ * @return array{0:int, 1:string, 2:string} exit code, stdout, stderr
+ */
+function mysql_run(string $db, string $sqlOrFile): array
+{
+    $c = config()['db'];
+    $cmd = [getenv('MYSQL_BIN') ?: 'C:\xampp 8.2\mysql\bin\mysql.exe', '--no-defaults', '--batch',
+        '-h', (string)$c['host'], '-P', (string)($c['port'] ?? 3306), '-u', (string)$c['user']];
+    if ((string)$c['pass'] !== '') {
+        $cmd[] = '-p' . $c['pass'];
+    }
+    if ($db !== '') {
+        $cmd[] = $db;
+    }
+    $sql = is_file($sqlOrFile) ? (string)file_get_contents($sqlOrFile) : $sqlOrFile;
+    $proc = proc_open($cmd, [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    if (!is_resource($proc)) {
+        return [-1, '', 'proc_open failed'];
+    }
+    fwrite($pipes[0], $sql);
+    fclose($pipes[0]);
+    $out = (string)stream_get_contents($pipes[1]);
+    $err = (string)stream_get_contents($pipes[2]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    return [proc_close($proc), $out, $err];
 }
 
 function latest_attempt(int $learnerId): ?array
@@ -205,10 +273,29 @@ function latest_attempt(int $learnerId): ?array
     return $row === false ? null : $row;
 }
 
+function completion_count(int $learnerId): int
+{
+    $stmt = db()->prepare('SELECT COUNT(*) FROM completions WHERE learner_id = ?');
+    $stmt->execute([$learnerId]);
+    return (int)$stmt->fetchColumn();
+}
+
+/** Insert a passed attempt of the old single final quiz (as left by the old portal, quiz_key 'kuiz-akhir'). */
+function legacy_attempt_create(int $learnerId, string $courseKey): int
+{
+    db()->prepare(
+        "INSERT INTO quiz_attempts (learner_id, course_key, quiz_key, correct_count, total_questions, score_percent, passed, answers_json, created_at)
+         VALUES (?, ?, 'kuiz-akhir', 9, 10, 90.00, 1, '{}', ?)"
+    )->execute([$learnerId, $courseKey, now_str()]);
+    return (int)db()->lastInsertId();
+}
+
 try {
     // 1. Landing page.
     $r = http('GET', '/');
-    step(1, 'GET / returns 200 with Daftar Sekarang', $r['status'] === 200 && strpos($r['body'], 'Daftar Sekarang') !== false, "status {$r['status']}");
+    step(1, 'GET / returns 200 with Daftar Sekarang and the per-module quiz text',
+        $r['status'] === 200 && strpos($r['body'], 'Daftar Sekarang') !== false
+        && strpos($r['body'], 'lulus kuiz di hujung setiap modul') !== false, "status {$r['status']}");
 
     // 2. Registration.
     $suffix = (string)time();
@@ -232,80 +319,107 @@ try {
     }
     $learnerId = (int)$learner['id'];
 
-    // 3. Quiz gated before Modul 1-5 are completed.
-    $page = http('GET', 'course.php?lesson=kuiz-akhir');
-    $gateShown = strpos($page['body'], 'Sila lengkapkan semua modul') !== false
+    // 3. Kuiz Modul 1 is locked before the Modul 1 lessons are done.
+    $page = http('GET', 'course.php?lesson=kuiz-modul-1');
+    $gateShown = $page['status'] === 403 && strpos($page['body'], 'Sila lengkapkan semua pelajaran dalam Modul 1') !== false
         && strpos($page['body'], 'quiz-submit.php') === false;
-    $r = quiz_post(answers_with($quiz, 10));
-    step(3, 'quiz gated before modules complete (gate message, submit 403)', $gateShown && $r['status'] === 403, "submit status {$r['status']}");
+    $r = quiz_post('kuiz-modul-1', answers_with($quizzes[1]['questions'], 3));
+    step(3, 'Kuiz Modul 1 locked before Modul 1 lessons (403 lock page without quiz form, submit 403)',
+        $gateShown && $r['status'] === 403, "page status {$page['status']} submit status {$r['status']}");
 
-    // 4. Viewer navigation and lesson completion.
+    // 4. Modul 2 is refused before Kuiz Modul 1 is passed.
+    $page = http('GET', 'course.php?lesson=modul-2-pengenalan');
+    $r = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($page['body']), 'lesson' => 'modul-2-pengenalan']);
+    step(4, 'Modul 2 locked before Kuiz Modul 1 pass (403 "Modul ini dikunci", lesson-complete 403, no progress)',
+        $page['status'] === 403 && strpos($page['body'], 'Modul ini dikunci. Sila lulus Kuiz Modul 1 terlebih dahulu.') !== false
+        && strpos($page['body'], 'class="slide"') === false && strpos($page['body'], 'is-locked') !== false
+        && $r['status'] === 403 && !in_array('modul-2-pengenalan', progress_keys($learnerId), true),
+        "page {$page['status']} complete {$r['status']}");
+
+    // 5. Viewer navigation and Modul 1 lesson completion.
     $m1 = count($course->lesson('modul-1-pengenalan')['slides']);
     $s1 = http('GET', 'course.php?lesson=modul-1-pengenalan&slide=1');
     $sN = http('GET', 'course.php?lesson=modul-1-pengenalan&slide=' . $m1);
-    $ok = strpos($s1['body'], ">1/$m1<") !== false && strpos($sN['body'], ">$m1/$m1<") !== false;
-    for ($n = 1; $n <= 5; $n++) {
-        $key = "modul-$n-pengenalan";
-        $slides = count($course->lesson($key)['slides']);
-        $page = http('GET', 'course.php?lesson=' . $key . '&slide=' . $slides);
-        $r = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($page['body']), 'lesson' => $key]);
-        $next = $course->nextLesson($key)['key'];
-        if ($r['status'] !== 302 || $r['location'] !== 'course.php?lesson=' . $next) {
-            $ok = false;
-        }
-    }
-    step(4, "viewer 1/$m1 -> $m1/$m1 and lesson-complete on each module's last slide leads to the next lesson for Modul 1-5", $ok);
+    $r = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($sN['body']), 'lesson' => 'modul-1-pengenalan']);
+    step(5, "viewer 1/$m1 -> $m1/$m1 and completing Modul 1 leads to Kuiz Modul 1",
+        strpos($s1['body'], ">1/$m1<") !== false && strpos($sN['body'], ">$m1/$m1<") !== false
+        && $r['status'] === 302 && $r['location'] === 'course.php?lesson=kuiz-modul-1',
+        "status {$r['status']} location {$r['location']}");
 
-    // 5. Completion refused before passing.
-    $page = http('GET', 'course.php?lesson=kuiz-akhir');
+    // 6. Completion refused before passing; the quiz page shows no correct answers.
+    $page = http('GET', 'course.php?lesson=kuiz-modul-1');
     $r = http('POST', 'complete.php', ['csrf' => csrf_from($page['body'])]);
-    $stmt = db()->prepare('SELECT COUNT(*) FROM completions WHERE learner_id = ?');
-    $stmt->execute([$learnerId]);
-    step(5, 'complete.php before passing creates no completion', (int)$stmt->fetchColumn() === 0 && $r['status'] === 302,
-        "status {$r['status']}");
+    $leak = quiz_page_leaks($page['body'], $quizzes[1]['questions']);
+    step(6, 'Kuiz Modul 1 opens (3 questions, no answers in HTML); complete.php before passing creates no completion',
+        $page['status'] === 200 && strpos($page['body'], 'name="quiz" value="kuiz-modul-1"') !== false && !$leak
+        && completion_count($learnerId) === 0 && $r['status'] === 302 && $r['location'] === 'course.php?lesson=kuiz-modul-1',
+        "status {$r['status']} location {$r['location']} leak=" . ($leak ? 'yes' : 'no'));
 
-    // Correct answers are never in the quiz page HTML.
-    $leak = false;
-    foreach ($quiz['questions'] as $q) {
-        if (strpos($page['body'], 'name="answers[' . $q['id'] . ']"') === false) {
-            $leak = true;
-        }
-    }
-    $leak = $leak || strpos($page['body'], 'answer"') !== false || strpos($page['body'], 'checked') !== false;
+    // 7. Failing attempt on Kuiz Modul 1 (2/3).
+    $r = quiz_post('kuiz-modul-1', answers_with($quizzes[1]['questions'], 2));
+    $a = latest_attempt($learnerId);
+    $failId = (int)($a['id'] ?? 0);
+    $res = $r['location'] !== '' ? http('GET', $r['location']) : ['body' => ''];
+    step(7, 'Kuiz Modul 1 2/3 stored (quiz_key kuiz-modul-1, passed=0) and shows GAGAL + Cuba Lagi',
+        $a !== null && $a['quiz_key'] === 'kuiz-modul-1' && (int)$a['correct_count'] === 2 && (int)$a['passed'] === 0
+        && strpos($res['body'], 'Markah anda: 2/3 (66.67%)') !== false
+        && strpos($res['body'], 'GAGAL') !== false && strpos($res['body'], 'Cuba Lagi') !== false
+        && !in_array('kuiz-modul-1', progress_keys($learnerId), true),
+        "location {$r['location']}");
 
-    // 6. Failing attempt (7/10).
-    $r = quiz_post(answers_with($quiz, 7));
+    // 8. Retry passes; Modul 2 opens.
+    $r = quiz_post('kuiz-modul-1', answers_with($quizzes[1]['questions'], 3));
     $a = latest_attempt($learnerId);
     $res = $r['location'] !== '' ? http('GET', $r['location']) : ['body' => ''];
-    step(6, '7/10 attempt stored passed=0 and shows GAGAL + Cuba Lagi (quiz form has no answers)',
-        !$leak && $a !== null && (int)$a['correct_count'] === 7 && (int)$a['passed'] === 0
-        && strpos($res['body'], 'Markah anda: 7/10 (70%)') !== false
-        && strpos($res['body'], 'GAGAL') !== false && strpos($res['body'], 'Cuba Lagi') !== false,
-        'leak=' . ($leak ? 'yes' : 'no') . " location {$r['location']}");
+    $m2 = http('GET', 'course.php?lesson=modul-2-pengenalan');
+    $c2 = http('POST', 'lesson-complete.php', ['csrf' => csrf_from($m2['body']), 'lesson' => 'modul-2-pengenalan']);
+    $wrongQuiz = http('GET', 'course.php?lesson=kuiz-modul-2&attempt=' . $failId);
+    step(8, 'Kuiz Modul 1 retry 3/3 LULUS (no completion form, sidebar LULUS); Modul 2 now 200 and completable',
+        $a !== null && $a['quiz_key'] === 'kuiz-modul-1' && (int)$a['passed'] === 1
+        && strpos($res['body'], 'Markah anda: 3/3 (100%)') !== false && strpos($res['body'], 'LULUS') !== false
+        && strpos($res['body'], 'Tahniah! Anda lulus kuiz ini.') !== false
+        && strpos($res['body'], 'Teruskan ke Asas AI') !== false
+        && strpos($res['body'], 'action="complete.php"') === false
+        && sidebar_quiz_status($res['body'], 'Kuiz Modul 1') === 'LULUS'
+        && sidebar_quiz_status($res['body'], 'Kuiz Modul 2') === 'BELUM LULUS'
+        && in_array('kuiz-modul-1', progress_keys($learnerId), true)
+        && $m2['status'] === 200 && $c2['status'] === 302 && $c2['location'] === 'course.php?lesson=kuiz-modul-2'
+        && $wrongQuiz['status'] === 404,
+        "modul-2 {$m2['status']} complete {$c2['status']} other-quiz attempt {$wrongQuiz['status']}");
 
-    // 7. Passing attempt (8/10).
-    $r = quiz_post(answers_with($quiz, 8));
-    $a = latest_attempt($learnerId);
+    // 9. Pass Modul 2-4; while Kuiz Modul 5 is unpassed nothing completes the course.
+    $ok = pass_module(2) && pass_module(3) && pass_module(4) && complete_lessons(['modul-5-pengenalan']);
+    $page = http('GET', 'course.php?lesson=kuiz-modul-5');
+    $done = http('POST', 'complete.php', ['csrf' => csrf_from($page['body'])]);
+    $cert = http('GET', 'certificate.php');
+    $pdf = http('GET', 'certificate-download.php');
+    $pen = http('GET', 'course.php?lesson=penutup');
+    step(9, 'after Kuiz Modul 1-4: complete.php, certificate and download refused, Penutup 403 while Kuiz Modul 5 unpassed',
+        $ok && $page['status'] === 200 && completion_count($learnerId) === 0
+        && $done['status'] === 302 && $done['location'] === 'course.php?lesson=kuiz-modul-5'
+        && $cert['status'] === 302 && $cert['location'] === 'course.php?lesson=kuiz-modul-5'
+        && $pdf['status'] === 302 && strncmp($pdf['body'], '%PDF', 4) !== 0
+        && $pen['status'] === 403 && strpos($pen['body'], 'Penutup dibuka selepas anda lulus kesemua kuiz modul') !== false,
+        "complete {$done['location']} cert {$cert['status']} pdf {$pdf['status']} penutup {$pen['status']}");
+
+    // 10. Pass Kuiz Modul 5, then LENGKAP & TERUSKAN creates the completion.
+    $r = quiz_post('kuiz-modul-5', answers_with($quizzes[5]['questions'], 2));
     $res = $r['location'] !== '' ? http('GET', $r['location']) : ['body' => ''];
-    step(7, '8/10 attempt stored passed=1 and shows LULUS',
-        $a !== null && (int)$a['correct_count'] === 8 && (int)$a['passed'] === 1
-        && strpos($res['body'], 'Markah anda: 8/10 (80%)') !== false && strpos($res['body'], 'LULUS') !== false
-        && strpos($res['body'], 'complete.php') !== false);
-
-    // 8. Completion.
     $r = http('POST', 'complete.php', ['csrf' => csrf_from($res['body'])]);
     $completion = completion_find($learnerId, $courseKey);
     $code = $completion['certificate_code'] ?? '';
-    step(8, 'complete.php creates a completion with a NADI-XXXXXXXXXX code and redirects to certificate.php',
-        $completion !== null && preg_match('/^NADI-[0-9A-F]{10}$/', $code) === 1
-        && $r['status'] === 302 && $r['location'] === 'certificate.php',
-        "status {$r['status']} location {$r['location']} code $code");
+    $pen = http('GET', 'course.php?lesson=penutup');
+    step(10, 'Kuiz Modul 5 pass offers LENGKAP & TERUSKAN; complete.php creates a NADI-XXXXXXXXXX code; Penutup opens; no answers leaked',
+        strpos($res['body'], 'action="complete.php"') !== false
+        && $completion !== null && preg_match('/^NADI-[0-9A-F]{10}$/', $code) === 1
+        && $r['status'] === 302 && $r['location'] === 'certificate.php' && $pen['status'] === 200 && !$leakFound,
+        "status {$r['status']} location {$r['location']} code $code leak=" . ($leakFound ? 'yes' : 'no'));
 
-    // 9. Certificate PDF.
+    // 11. Certificate PDF.
     $cert = http('GET', 'certificate.php');
     $pdf = http('GET', 'certificate-download.php');
     $today = format_date_ms(date('Y-m-d H:i:s'));
-    step(9, 'certificate PDF has the name, today\'s date and the code',
+    step(11, 'certificate PDF has the name, today\'s date and the code',
         strpos($cert['body'], 'Tahniah!') !== false
         && strpos($pdf['type'], 'application/pdf') === 0 && strncmp($pdf['body'], '%PDF', 4) === 0
         && strpos($pdf['body'], "$first $last") !== false && strpos($pdf['body'], $today) !== false
@@ -315,58 +429,58 @@ try {
         file_put_contents($argv[2], $pdf['body']);
     }
 
-    // 10. Public verification.
+    // 12. Public verification.
     $v = http('GET', 'verify.php?code=' . rawurlencode(strtolower($code)));
-    step(10, 'verify.php shows Sijil sah with the name',
+    step(12, 'verify.php shows Sijil sah with the name',
         strpos($v['body'], 'Sijil sah') !== false && strpos($v['body'], "$first $last") !== false);
 
     // Shared computer: learner A (above) registered without "Ingat saya", finished and now leaves.
-    // 11. No persistent learner cookie, and the certificate page offers "Selesai / Keluar".
+    // 13. No persistent learner cookie, and the certificate page offers "Selesai / Keluar".
     $jarNow = cookies();
-    step(11, 'A has no persistent learner cookie and the certificate page shows Selesai / Keluar',
+    step(13, 'A has no persistent learner cookie and the certificate page shows Selesai / Keluar',
         !isset($jarNow[LEARNER_COOKIE]) && strpos($cert['body'], 'Selesai / Keluar') !== false
         && strpos($cert['body'], 'action="reset.php"') !== false,
         'cookies: ' . implode(',', array_keys($jarNow)));
 
-    // 12. A presses "Selesai / Keluar".
+    // 14. A presses "Selesai / Keluar".
     $r = http('POST', 'reset.php', ['csrf' => csrf_from($cert['body'])]);
-    step(12, 'Selesai / Keluar signs A out and redirects to index.php?keluar=1',
+    step(14, 'Selesai / Keluar signs A out and redirects to index.php?keluar=1',
         $r['status'] === 302 && $r['location'] === 'index.php?keluar=1', "status {$r['status']} location {$r['location']}");
 
-    // 13. The next person on the same browser sees nothing of A.
+    // 15. The next person on the same browser sees nothing of A.
     $bye = http('GET', $r['location']);
     $home = http('GET', '/');
     $reg = http('GET', 'register.php');
-    step(13, 'next visitor sees no name or progress of A and cannot open or download A\'s certificate',
+    step(15, 'next visitor sees no name or progress of A and cannot open or download A\'s certificate',
         strpos($bye['body'], 'Anda telah keluar') !== false
         && strpos($home['body'], 'Daftar Sekarang') !== false
         && strpos($home['body'] . $bye['body'] . $reg['body'], $last) === false
         && strpos($reg['body'], $email) === false
-        && redirects_to_register('course.php') && redirects_to_register('course.php?lesson=kuiz-akhir')
+        && redirects_to_register('course.php') && redirects_to_register('course.php?lesson=kuiz-modul-1')
         && redirects_to_register('certificate.php') && redirects_to_register('certificate-download.php'));
 
-    // 14. Shared computer, learner leaves without pressing Keluar and the browser is closed.
+    // 16. Shared computer, learner leaves without pressing Keluar and the browser is closed.
     $lastB = 'E2EB' . $suffix;
     register_learner('Ujian', $lastB, 'e2e-b+' . $suffix . '@example.com', false);
     $before = http('GET', '/');
     close_browser();
     $after = http('GET', '/');
-    step(14, 'without Keluar, closing the browser forgets a learner who did not tick Ingat saya',
+    step(16, 'without Keluar, closing the browser forgets a learner who did not tick Ingat saya',
         strpos($before['body'], $lastB) !== false && strpos($after['body'], $lastB) === false
         && strpos($after['body'], 'Daftar Sekarang') !== false && redirects_to_register('certificate-download.php'));
 
-    // 15. Shared computer, learner walks away and the browser stays open: idle timeout.
+    // 17. Shared computer, learner walks away and the browser stays open: idle timeout.
     $lastC = 'E2EC' . $suffix;
     register_learner('Ujian', $lastC, 'e2e-c+' . $suffix . '@example.com', false);
     $before = http('GET', '/');
     $aged = age_session(LEARNER_IDLE_MINUTES * 60 + 60);
     $after = http('GET', '/');
-    step(15, 'after ' . LEARNER_IDLE_MINUTES . ' idle minutes the learner is signed out',
+    step(17, 'after ' . LEARNER_IDLE_MINUTES . ' idle minutes the learner is signed out',
         $aged && strpos($before['body'], $lastC) !== false && strpos($after['body'], $lastC) === false
         && redirects_to_register('course.php'),
         $aged ? '' : 'could not age the session file');
 
-    // 16. Own device: "Ingat saya" keeps the learner across a browser restart until "Bukan anda? Mula semula".
+    // 18. Own device: "Ingat saya" keeps the learner across a browser restart until "Bukan anda? Mula semula".
     $lastD = 'E2ED' . $suffix;
     register_learner('Ujian', $lastD, 'e2e-d+' . $suffix . '@example.com', true);
     $token = cookies()[LEARNER_COOKIE] ?? null;
@@ -377,11 +491,11 @@ try {
     $r = http('POST', 'reset.php', ['csrf' => csrf_from($home['body'])]);
     close_browser();
     $home = http('GET', '/');
-    step(16, 'Ingat saya keeps the learner for ' . LEARNER_COOKIE_DAYS . ' days; Mula semula removes the cookie',
+    step(18, 'Ingat saya keeps the learner for ' . LEARNER_COOKIE_DAYS . ' days; Mula semula removes the cookie',
         $remembered && $r['status'] === 302 && !isset(cookies()[LEARNER_COOKIE])
         && strpos($home['body'], $lastD) === false && strpos($home['body'], 'Daftar Sekarang') !== false);
 
-    // 17. A remembered learner's cookie does not survive the next person registering without "Ingat saya".
+    // 19. A remembered learner's cookie does not survive the next person registering without "Ingat saya".
     $lastE = 'E2EE' . $suffix;
     $lastF = 'E2EF' . $suffix;
     register_learner('Ujian', $lastE, 'e2e-e+' . $suffix . '@example.com', true);
@@ -390,7 +504,7 @@ try {
     $hadCookie = $c !== null && $c['expires'] > time(); // curl may keep a deleted cookie as already expired
     close_browser();
     $home = http('GET', '/');
-    step(17, 'registering without Ingat saya clears an earlier learner\'s remember cookie',
+    step(19, 'registering without Ingat saya clears an earlier learner\'s remember cookie',
         !$hadCookie && strpos($home['body'], $lastE) === false && strpos($home['body'], $lastF) === false,
         'cookie=' . ($hadCookie ? 'yes' : 'no') . ' E=' . (strpos($home['body'], $lastE) !== false ? 'shown' : 'hidden')
         . ' F=' . (strpos($home['body'], $lastF) !== false ? 'shown' : 'hidden'));
@@ -400,62 +514,63 @@ try {
     db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$localIp]);
     $allLessons = count($course->lessons());
 
-    // 18. Device 1: learner G registers without "Ingat saya", completes Modul 1-2, presses Keluar.
+    // 20. Device 1: learner G registers without "Ingat saya", passes Modul 1, completes the Modul 2 lesson, presses Keluar.
     device('device-1');
     $lastG = 'E2EG' . $suffix;
     $emailG = 'e2e-g+' . $suffix . '@example.com';
     register_learner('Ujian', $lastG, $emailG, false);
-    $ok = complete_lessons(['modul-1-pengenalan', 'modul-2-pengenalan']);
+    $ok = pass_module(1) && complete_lessons(['modul-2-pengenalan']);
     $page = http('GET', 'course.php');
     $r = http('POST', 'reset.php', ['csrf' => csrf_from($page['body'])]);
     $idsG = learner_ids_by_email($emailG);
-    step(18, 'device 1: G completes 2 lessons, the course page has Selesai / Keluar, G signs out',
-        $ok && count($idsG) === 1 && count(progress_keys($idsG[0])) === 2
+    step(20, 'device 1: G passes Kuiz Modul 1 and completes Modul 2 lesson (3 lessons), the course page has Selesai / Keluar, G signs out',
+        $ok && count($idsG) === 1 && count(progress_keys($idsG[0])) === 3
         && strpos($page['body'], 'Selesai / Keluar') !== false && $r['location'] === 'index.php?keluar=1');
 
-    // 19. Device 2 (fresh browser): Sambung Semula with G's e-mail (different letter case) restores G's progress.
+    // 21. Device 2 (fresh browser): Sambung Semula with G's e-mail (different letter case) restores progress and quiz status.
     device('device-2');
     $home = http('GET', '/');
     $r = resume_with(strtoupper($emailG));
     $page = http('GET', 'course.php');
-    $pct = (int)round(2 * 100 / $allLessons);
-    step(19, 'device 2: Sambung Semula with G\'s e-mail restores G\'s progress (no remember cookie)',
+    $pct = (int)round(3 * 100 / $allLessons);
+    step(21, 'device 2: Sambung Semula restores G\'s progress (' . $pct . '%), Kuiz Modul 1 LULUS, Kuiz Modul 2 not passed (no remember cookie)',
         strpos($home['body'], 'Sambung Semula') !== false && strpos($home['body'], 'action="resume.php"') !== false
         && $r['status'] === 302 && $r['location'] === 'course.php'
         && strpos($page['body'], 'Kemajuan anda telah disambung semula') !== false
         && strpos($page['body'], $lastG) !== false
         && strpos($page['body'], 'progress-text">' . $pct . '% selesai') !== false
+        && sidebar_quiz_status($page['body'], 'Kuiz Modul 1') === 'LULUS'
+        && sidebar_quiz_status($page['body'], 'Kuiz Modul 2') === 'BELUM LULUS'
         && !isset(cookies()[LEARNER_COOKIE]),
         "status {$r['status']} location {$r['location']}");
 
-    // 20. G finishes on device 2 and downloads the certificate with G's name.
-    $ok = complete_lessons(['modul-3-pengenalan', 'modul-4-pengenalan', 'modul-5-pengenalan']);
-    $r = quiz_post(answers_with($quiz, 9));
-    $res = http('GET', $r['location']);
-    $r = http('POST', 'complete.php', ['csrf' => csrf_from($res['body'])]);
+    // 22. G finishes Modul 2-5 on device 2 and downloads the certificate with G's name.
+    $ok = pass_module(2) && pass_module(3) && pass_module(4) && pass_module(5);
+    $page = http('GET', 'course.php?lesson=kuiz-modul-5');
+    $r = http('POST', 'complete.php', ['csrf' => csrf_from($page['body'])]);
     $pdf = http('GET', 'certificate-download.php');
-    step(20, 'device 2: G finishes, passes and downloads a certificate with G\'s name',
+    step(22, 'device 2: G passes Kuiz Modul 2-5, completes and downloads a certificate with G\'s name',
         $ok && $r['location'] === 'certificate.php' && strncmp($pdf['body'], '%PDF', 4) === 0
         && strpos($pdf['body'], 'Ujian ' . $lastG) !== false && completion_find($idsG[0], $courseKey) !== null);
 
-    // 21. Unknown e-mail: Malay not-found message with a link to registration.
+    // 23. Unknown e-mail: Malay not-found message with a link to registration.
     device('device-3');
     $r = resume_with('tiada-' . $suffix . '@example.com');
-    step(21, 'unknown e-mail shows the Malay not-found message and offers registration',
+    step(23, 'unknown e-mail shows the Malay not-found message and offers registration',
         $r['status'] === 404 && strpos($r['body'], 'Tiada peserta berdaftar dengan e-mel ini') !== false
         && strpos($r['body'], 'href="register.php"') !== false && redirects_to_register('course.php'),
         "status {$r['status']}");
 
-    // 22. Registering again with G's e-mail resumes G (no duplicate row; G's name stays on the certificate).
+    // 24. Registering again with G's e-mail resumes G (no duplicate row; G's name stays on the certificate).
     $r = register_learner('Lain', 'Orang' . $suffix, $emailG, false);
     $page = http('GET', 'course.php');
     $cert = http('GET', 'certificate.php');
-    step(22, 're-registering with an existing e-mail resumes that learner without creating a duplicate',
+    step(24, 're-registering with an existing e-mail resumes that learner without creating a duplicate',
         $r['status'] === 302 && $r['location'] === 'course.php' && learner_ids_by_email($emailG) === $idsG
         && strpos($page['body'], 'E-mel ini sudah berdaftar') !== false
         && strpos($cert['body'], 'Ujian ' . $lastG) !== false && strpos($cert['body'], 'Orang' . $suffix) === false);
 
-    // 23. Duplicate e-mails left by earlier testing: the record with the most progress is resumed.
+    // 25. Duplicate e-mails left by earlier testing: the record with the most progress is resumed.
     $emailDup = 'e2e-dup+' . $suffix . '@example.com';
     $dupFields = ['age' => 30, 'email' => $emailDup, 'phone' => '0123456789', 'address' => 'Ujian', 'occupation' => 'Penguji'];
     $older = learner_create(['first_name' => 'Lama', 'last_name' => 'Dup' . $suffix] + $dupFields, hash('sha256', random_bytes(32)));
@@ -472,16 +587,17 @@ try {
     resume_with($emailDup);
     $page = http('GET', 'course.php');
     $tieNewest = strpos($page['body'], 'Baru Dup' . $suffix) !== false;
-    step(23, 'duplicate e-mail: the learner with the most progress is resumed, the newest on a tie; no rows removed',
+    step(25, 'duplicate e-mail: the learner with the most progress is resumed, the newest on a tie; no rows removed',
         $pickMost && $tieNewest && learner_ids_by_email($emailDup) === [$older, $newer]);
 
-    // 24. Long reading: more than the idle timeout inside one module, with slide activity, keeps the learner.
+    // 26. Long reading: more than the idle timeout inside one module, with slide activity, keeps the learner.
     device('reader');
     $lastH = 'E2EH' . $suffix;
     register_learner('Ujian', $lastH, 'e2e-h+' . $suffix . '@example.com', false);
+    $ok = pass_module(1) && pass_module(2) && pass_module(3);
     $page = http('GET', 'course.php?lesson=modul-4-pengenalan&slide=1');
     $csrf = csrf_from($page['body']);
-    $ok = strpos($page['body'], 'assets/js/course.js') !== false;
+    $ok = $ok && $page['status'] === 200 && strpos($page['body'], 'assets/js/course.js') !== false;
     for ($i = 0; $i < 3; $i++) {
         $ok = $ok && age_session(20 * 60); // 20 minutes on slides without a page request
         $ping = http('POST', 'keepalive.php', ['csrf' => $csrf]);
@@ -492,12 +608,12 @@ try {
     $idH = learner_ids_by_email('e2e-h+' . $suffix . '@example.com')[0] ?? 0;
     device('no-session');
     $anon = http('POST', 'keepalive.php', ['csrf' => csrf_from(http('GET', 'resume.php')['body'])]);
-    step(24, '80 minutes reading Modul 4 with keep-alive pings: lesson-complete still saves the progress',
-        $ok && $r['status'] === 302 && $r['location'] === 'course.php?lesson=modul-5-pengenalan'
+    step(26, '80 minutes reading Modul 4 (after Kuiz Modul 1-3) with keep-alive pings: lesson-complete still saves the progress',
+        $ok && $r['status'] === 302 && $r['location'] === 'course.php?lesson=kuiz-modul-4'
         && in_array('modul-4-pengenalan', progress_keys($idH), true) && $anon['status'] === 401,
         "complete status {$r['status']} location {$r['location']} anon keepalive {$anon['status']}");
 
-    // 25. "Ingat saya" on two own devices: resuming with the box ticked on device B keeps device A remembered.
+    // 27. "Ingat saya" on two own devices: resuming with the box ticked on device B keeps device A remembered.
     device('phone');
     $lastI = 'E2EI' . $suffix;
     $emailI = 'e2e-i+' . $suffix . '@example.com';
@@ -510,11 +626,11 @@ try {
     device('phone');
     close_browser();
     $phone = http('GET', '/');
-    step(25, 'Sambung Semula with Ingat saya sets a 30-day cookie and the first device stays remembered',
+    step(27, 'Sambung Semula with Ingat saya sets a 30-day cookie and the first device stays remembered',
         $laptopCookie !== null && $laptopCookie['expires'] > time() + (LEARNER_COOKIE_DAYS - 1) * 86400
         && strpos($laptop['body'], $lastI) !== false && strpos($phone['body'], $lastI) !== false);
 
-    // 26. Rate limit: after RESUME_MAX_PER_EMAIL tries for one e-mail, the next one is refused with 429.
+    // 28. Rate limit: after RESUME_MAX_PER_EMAIL tries for one e-mail, the next one is refused with 429.
     device('attacker');
     $target = 'e2e-rl+' . $suffix . '@example.com';
     $statuses = [];
@@ -523,11 +639,89 @@ try {
     }
     $last = array_pop($statuses);
     $r = resume_with($target);
-    step(26, 'Sambung Semula is rate limited (' . RESUME_MAX_PER_EMAIL . ' tries per e-mail per '
+    step(28, 'Sambung Semula is rate limited (' . RESUME_MAX_PER_EMAIL . ' tries per e-mail per '
         . RESUME_WINDOW_MINUTES . ' minutes)',
         array_unique($statuses) === [404] && $last === 429 && strpos($r['body'], 'Terlalu banyak cubaan') !== false,
         'statuses ' . implode(',', $statuses) . " then $last");
     db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$localIp]);
+
+    // 29. Legacy learner: passed the old Kuiz Akhir (quiz_key 'kuiz-akhir') but never pressed LENGKAP & TERUSKAN.
+    $emailJ = 'e2e-j+' . $suffix . '@example.com';
+    $idJ = learner_create(['first_name' => 'Lama', 'last_name' => 'Akhir' . $suffix, 'age' => 40, 'email' => $emailJ,
+        'phone' => '0123456789', 'address' => 'Ujian', 'occupation' => 'Penguji'], hash('sha256', random_bytes(32)));
+    for ($n = 1; $n <= 5; $n++) {
+        progress_mark($idJ, "modul-$n-pengenalan");
+    }
+    legacy_attempt_create($idJ, $courseKey);
+    device('legacy-j');
+    resume_with($emailJ);
+    $m5 = http('GET', 'course.php?lesson=modul-5-pengenalan');
+    $pen = http('GET', 'course.php?lesson=penutup');
+    $r = http('POST', 'complete.php', ['csrf' => csrf_from($pen['body'])]);
+    $cJ = completion_find($idJ, $courseKey);
+    $v = $cJ !== null ? http('GET', 'verify.php?code=' . rawurlencode($cJ['certificate_code'])) : ['body' => ''];
+    step(29, 'legacy kuiz-akhir pass: Modul 5 and Penutup open, complete.php creates a completion, verify shows Sijil sah',
+        $m5['status'] === 200 && $pen['status'] === 200 && sidebar_quiz_status($pen['body'], 'Kuiz Modul 3') === 'LULUS'
+        && $r['status'] === 302 && $r['location'] === 'certificate.php' && $cJ !== null
+        && strpos($v['body'], 'Sijil sah') !== false && strpos($v['body'], 'Lama Akhir' . $suffix) !== false,
+        "modul-5 {$m5['status']} penutup {$pen['status']} complete {$r['location']}");
+
+    // 30. Legacy learner with an old completion downloads the certificate (code and date unchanged).
+    $emailK = 'e2e-k+' . $suffix . '@example.com';
+    $idK = learner_create(['first_name' => 'Lama', 'last_name' => 'Selesai' . $suffix, 'age' => 40, 'email' => $emailK,
+        'phone' => '0123456789', 'address' => 'Ujian', 'occupation' => 'Penguji'], hash('sha256', random_bytes(32)));
+    $cK = completion_create($idK, $courseKey, legacy_attempt_create($idK, $courseKey));
+    device('legacy-k');
+    resume_with($emailK);
+    $pdf = http('GET', 'certificate-download.php');
+    $q1 = http('GET', 'course.php?lesson=kuiz-modul-1');
+    $cK2 = completion_find($idK, $courseKey);
+    step(30, 'legacy completion: certificate downloads with the original code, quizzes show LULUS',
+        strncmp($pdf['body'], '%PDF', 4) === 0 && strpos($pdf['body'], $cK['certificate_code']) !== false
+        && sidebar_quiz_status($q1['body'], 'Kuiz Modul 5') === 'LULUS' && $cK2 == $cK,
+        "pdf status {$pdf['status']}");
+
+    // 31. Migration on a scratch copy in the old format: imports twice, old rows become 'kuiz-akhir', completions intact.
+    $scratch = config()['db']['name'] . '_migtest';
+    $ok = true;
+    $detail = [];
+    [$x, , $err] = mysql_run('', "DROP DATABASE IF EXISTS `$scratch`; CREATE DATABASE `$scratch` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+    $ok = $ok && $x === 0;
+    [$x, , $err2] = mysql_run($scratch, APP_ROOT . '/sql/schema.sql');
+    $ok = $ok && $x === 0;
+    [$x, , $err3] = mysql_run($scratch,
+        "ALTER TABLE quiz_attempts DROP INDEX idx_attempts_learner_quiz, DROP COLUMN quiz_key;
+         INSERT INTO learners (id, first_name, last_name, age, email, phone, address, occupation, token_hash, created_at)
+             VALUES (1, 'Lama', 'Migrasi', 40, 'mig@example.com', '0123456789', 'Ujian', 'Penguji', REPEAT('a', 64), '2026-01-02 03:04:05');
+         INSERT INTO quiz_attempts (id, learner_id, course_key, correct_count, total_questions, score_percent, passed, answers_json, created_at)
+             VALUES (1, 1, 'ai-essentials', 8, 10, 80.00, 1, '{}', '2026-01-02 03:10:00');
+         INSERT INTO completions (id, learner_id, course_key, quiz_attempt_id, certificate_code, completed_at)
+             VALUES (1, 1, 'ai-essentials', 1, 'NADI-00000000AA', '2026-01-02 03:11:00');");
+    $ok = $ok && $x === 0;
+    $detail[] = trim($err . $err2 . $err3);
+    $exits = [];
+    for ($i = 0; $i < 2; $i++) {
+        [$x, , $e] = mysql_run($scratch, APP_ROOT . '/sql/migrate-module-quizzes.sql');
+        $exits[] = $x;
+        if ($e !== '') {
+            $detail[] = trim($e);
+        }
+    }
+    $c = config()['db'];
+    $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $c['host'], (int)($c['port'] ?? 3306), $scratch),
+        $c['user'], $c['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $col = $pdo->query("SHOW COLUMNS FROM quiz_attempts LIKE 'quiz_key'")->fetch();
+    $idx = $pdo->query("SHOW INDEX FROM quiz_attempts WHERE Key_name = 'idx_attempts_learner_quiz'")->fetchAll();
+    $row = $pdo->query('SELECT quiz_key, correct_count, passed FROM quiz_attempts WHERE id = 1')->fetch();
+    $comp = $pdo->query('SELECT learner_id, quiz_attempt_id, certificate_code, completed_at FROM completions')->fetchAll();
+    $pdo = null;
+    [$x] = mysql_run('', "DROP DATABASE IF EXISTS `$scratch`;");
+    step(31, "sql/migrate-module-quizzes.sql imports twice on old-format data ($scratch): column + index added, old attempt 'kuiz-akhir', completion intact",
+        $ok && $exits === [0, 0] && $col !== false && $col['Default'] === 'kuiz-akhir' && count($idx) === 2
+        && $row !== false && $row['quiz_key'] === 'kuiz-akhir' && (int)$row['passed'] === 1
+        && $comp == [['learner_id' => 1, 'quiz_attempt_id' => 1, 'certificate_code' => 'NADI-00000000AA', 'completed_at' => '2026-01-02 03:11:00']]
+        && $x === 0,
+        'exits ' . implode(',', $exits) . ' ' . implode(' | ', array_filter($detail)));
 } catch (Throwable $ex) {
     $failures++;
     echo 'FAIL aborted: ' . $ex->getMessage() . "\n";

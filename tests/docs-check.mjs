@@ -106,6 +106,36 @@ const helpers = `
     f.requestSubmit();
     await sleep(200);
   }
+  const ANS = ${JSON.stringify(ANSWERS)};
+  // Complete a slide lesson from its last slide; returns the hash after LENGKAP & TERUSKAN.
+  async function completeLesson(key) {
+    await go('#/kursus?lesson=' + key + '&slide=1');
+    const last = document.getElementById('slide-counter').textContent.split('/')[1];
+    await go('#/kursus?lesson=' + key + '&slide=' + last);
+    document.getElementById('complete-form').requestSubmit();
+    await sleep(150);
+    return location.hash;
+  }
+  // Answer the quiz of lesson key (all right, or the first question wrong) and submit.
+  async function answerQuiz(key, allRight) {
+    await go('#/kursus?lesson=' + key);
+    const qf = document.getElementById('quiz-form');
+    if (!qf) return false;
+    let first = true;
+    for (const fs of qf.querySelectorAll('fieldset')) {
+      const q = fs.querySelector('input').name;
+      const v = allRight || !first ? ANS[q] : (ANS[q] === 'a' ? 'b' : 'a');
+      qf.querySelector('input[name="' + q + '"][value="' + v + '"]').checked = true;
+      first = false;
+    }
+    qf.requestSubmit();
+    await sleep(200);
+    return true;
+  }
+  async function passModule(n) {
+    await completeLesson('modul-' + n + '-pengenalan');
+    return answerQuiz('kuiz-modul-' + n, true);
+  }
 `;
 
 try {
@@ -132,19 +162,31 @@ try {
     await register('DrafA', false);
     const out = { hash: location.hash, inSession: !!sessionStorage.getItem('${KEY}'), inLocal: !!localStorage.getItem('${KEY}') };
     out.topbarSignout = !!document.getElementById('topbar-signout-btn');
-    for (let n = 1; n <= 5; n++) {
-      await go('#/kursus?lesson=modul-' + n + '-pengenalan&slide=1');
-      const last = document.getElementById('slide-counter').textContent.split('/')[1];
-      await go('#/kursus?lesson=modul-' + n + '-pengenalan&slide=' + last);
-      document.getElementById('complete-form').requestSubmit();
-      await sleep(150);
-    }
-    await go('#/kursus?lesson=kuiz-akhir');
-    const qf = document.getElementById('quiz-form');
-    const ans = ${JSON.stringify(ANSWERS)};
-    for (const q in ans) qf.querySelector('input[name="' + q + '"][value="' + ans[q] + '"]').checked = true;
-    qf.requestSubmit();
-    await sleep(200);
+    await go('#/kursus?lesson=kuiz-modul-1');
+    out.quizLockedFirst = !!document.getElementById('lock-card') && !document.getElementById('quiz-form')
+      && text().includes('Sila lengkapkan semua pelajaran dalam Modul 1');
+    out.afterLesson1 = await completeLesson('modul-1-pengenalan');
+    await answerQuiz('kuiz-modul-1', false);
+    out.failText = text();
+    await go('#/kursus?lesson=modul-2-pengenalan');
+    const lock = document.getElementById('lock-card');
+    out.modul2Locked = !!lock && lock.innerText.includes('Modul ini dikunci. Sila lulus Kuiz Modul 1 terlebih dahulu.')
+      && !document.getElementById('viewer')
+      && !!document.querySelector('.lesson-row.is-locked[data-title="Asas AI"]');
+    await answerQuiz('kuiz-modul-1', true);
+    out.passText = text();
+    out.noFinishYet = !document.getElementById('finish-form');
+    out.sidebarPass = (document.querySelector('.lesson-row[data-title="Kuiz Modul 1"] .lesson-status') || {}).textContent;
+    const nextBtn = document.getElementById('next-lesson-btn');
+    out.nextHref = nextBtn ? nextBtn.getAttribute('href') : '';
+    out.modules = [];
+    for (let n = 2; n <= 4; n++) out.modules.push(await passModule(n));
+    await completeLesson('modul-5-pengenalan');
+    await go('#/sijil');
+    out.sijilBefore = location.hash;
+    await go('#/kursus?lesson=penutup');
+    out.penutupLocked = !!document.getElementById('lock-card');
+    out.modules.push(await answerQuiz('kuiz-modul-5', true));
     document.getElementById('finish-form').requestSubmit();
     await sleep(200);
     out.certHash = location.hash;
@@ -176,6 +218,17 @@ try {
   `);
   step('A registers without Ingat saya: state in sessionStorage only, course page has Selesai / Keluar',
     a.hash.startsWith('#/kursus') && a.inSession && !a.inLocal && a.topbarSignout, JSON.stringify(a).slice(0, 300));
+  step('Kuiz Modul 1 is locked before the Modul 1 lesson; completing Modul 1 leads to Kuiz Modul 1',
+    a.quizLockedFirst && a.afterLesson1 === '#/kursus?lesson=kuiz-modul-1', JSON.stringify(a).slice(0, 300));
+  step('Kuiz Modul 1 with one wrong answer: 2/3 (66.67%) GAGAL', a.failText.includes('Markah anda: 2/3 (66.67%)') && a.failText.includes('GAGAL'),
+    a.failText.slice(0, 300));
+  step('Modul 2 shows the lock card before Kuiz Modul 1 is passed', a.modul2Locked, JSON.stringify(a).slice(0, 300));
+  step('Kuiz Modul 1 retry: LULUS, no LENGKAP & TERUSKAN yet, sidebar LULUS, Teruskan ke Asas AI',
+    a.passText.includes('Markah anda: 3/3 (100%)') && a.passText.includes('Tahniah! Anda lulus kuiz ini.') && a.noFinishYet
+    && a.sidebarPass === 'LULUS' && a.nextHref === '#/kursus?lesson=modul-2-pengenalan', JSON.stringify(a).slice(0, 400));
+  step('Kuiz Modul 2-5 pass in order; #/sijil and Penutup refused before Kuiz Modul 5 is passed',
+    a.modules.length === 4 && a.modules.every(Boolean) && a.sijilBefore === '#/kursus?lesson=kuiz-modul-5' && a.penutupLocked,
+    JSON.stringify(a).slice(0, 400));
   step('A completes the course and sees the certificate with Selesai / Keluar', a.certHash === '#/sijil' && a.certShowsName && a.hasSignout, JSON.stringify(a).slice(0, 300));
   step('certificate download failure shows "Sijil tidak dapat dijana" (no console error)', a.downloadError, JSON.stringify(a).slice(0, 300));
   step('Selesai / Keluar: landing shows "Anda telah keluar", no name, storage cleared',
@@ -222,6 +275,7 @@ try {
   // Long reading inside one module: slide clicks every 20 minutes for 60 minutes keep the learner.
   const r = await tab.evaluate(helpers + `
     await register('DrafR', false);
+    for (let n = 1; n <= 3; n++) await passModule(n);
     await go('#/kursus?lesson=modul-4-pengenalan&slide=1');
     const real = Date.now;
     let offset = 0;
@@ -243,8 +297,8 @@ try {
     return { counter, hash: location.hash, done: !!(s && s.done['modul-4-pengenalan']),
       name: document.getElementById('app').textContent.includes('DrafR') }; // the name is hidden on narrow screens
   `);
-  step('80 minutes reading Modul 4 with slide clicks: not signed out, lesson saved', r.counter === '5/12' && r.done && r.name
-    && r.hash.startsWith('#/kursus?lesson=modul-5'), JSON.stringify(r));
+  step('80 minutes reading Modul 4 (after Kuiz Modul 1-3) with slide clicks: not signed out, lesson saved', r.counter === '5/12' && r.done && r.name
+    && r.hash === '#/kursus?lesson=kuiz-modul-4', JSON.stringify(r));
 
   await tab.evaluate(helpers + `await register('DrafC', false); return true;`);
   const tab2 = await openTab(base);

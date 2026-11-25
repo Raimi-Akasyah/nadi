@@ -24,17 +24,24 @@ check(format_date_ms('2026-03-05 00:00:00') === '5 Mac 2026', "format_date_ms us
 
 // --- Course structure ---
 $course = Course::load();
-check(count($course->sections()) === 8, 'course has 8 sections');
-$quizLessons = array_values(array_filter($course->lessons(), static function ($l) { return $l['type'] === 'quiz'; }));
-check(count($quizLessons) === 1, 'exactly 1 quiz lesson');
-check(($quizLessons[0]['key'] ?? null) === 'kuiz-akhir', 'quiz lesson key is kuiz-akhir');
-check($course->quizLesson()['key'] === 'kuiz-akhir', 'quizLesson() returns kuiz-akhir');
-$req = array_map(static function ($l) { return $l['key']; }, $course->quizRequiredLessons());
-check($req === ['modul-1-pengenalan', 'modul-2-pengenalan', 'modul-3-pengenalan', 'modul-4-pengenalan', 'modul-5-pengenalan'],
-    'quizRequiredLessons() returns modul-1..5-pengenalan');
-check(($course->nextLesson('modul-5-pengenalan')['key'] ?? null) === 'kuiz-akhir', "nextLesson('modul-5-pengenalan') is kuiz-akhir");
+check(count($course->sections()) === 7, 'course has 7 sections');
+check(count($course->lessons()) === 12, 'course has 12 lessons');
+$quizKeys = array_map(static function ($l) { return $l['key']; }, $course->quizLessons());
+check($quizKeys === ['kuiz-modul-1', 'kuiz-modul-2', 'kuiz-modul-3', 'kuiz-modul-4', 'kuiz-modul-5'], 'quizLessons() returns kuiz-modul-1..5');
+$lastOk = true;
+foreach ($course->quizLessons() as $n => $ql) {
+    $sec = $course->sectionLessons($ql['section_key']);
+    if ($ql['section_key'] !== 'modul-' . ($n + 1) || $sec[count($sec) - 1]['key'] !== $ql['key'] || $ql['title'] !== 'Kuiz Modul ' . ($n + 1)) {
+        $lastOk = false;
+    }
+}
+check($lastOk, 'each Kuiz Modul N is the last lesson of section modul-N');
+check($course->lesson('kuiz-akhir') === null, 'kuiz-akhir lesson is removed');
+check(($course->nextLesson('modul-1-pengenalan')['key'] ?? null) === 'kuiz-modul-1', "nextLesson('modul-1-pengenalan') is kuiz-modul-1");
+check(($course->nextLesson('kuiz-modul-1')['key'] ?? null) === 'modul-2-pengenalan', "nextLesson('kuiz-modul-1') is modul-2-pengenalan");
+check(($course->nextLesson('kuiz-modul-5')['key'] ?? null) === 'penutup', "nextLesson('kuiz-modul-5') is penutup");
 check($course->prevLesson($course->lessons()[0]['key']) === null, 'prevLesson of first lesson is null');
-check(($course->prevLesson('modul-2-pengenalan')['key'] ?? null) === 'modul-1-pengenalan', "prevLesson('modul-2-pengenalan') is modul-1-pengenalan");
+check(($course->prevLesson('modul-2-pengenalan')['key'] ?? null) === 'kuiz-modul-1', "prevLesson('modul-2-pengenalan') is kuiz-modul-1");
 check($course->lesson('does-not-exist') === null, 'lesson() returns null for unknown key');
 check(count($course->lesson('modul-1-pengenalan')['slides']) === 3, 'modul-1-pengenalan has 3 slides');
 $allLessons = $course->lessons();
@@ -64,21 +71,63 @@ foreach ($allLessons as $l) {
     }
 }
 check($slidesOk, 'every slide has a title and an image under 400000 bytes in public/ and docs/');
-check(count($course->sectionLessons('modul-1')) === 1, 'sectionLessons(modul-1) has 1 lesson');
+check(count($course->sectionLessons('modul-1')) === 2, 'sectionLessons(modul-1) has 2 lessons');
 check($course->lessonLabel($course->lesson('modul-1-pengenalan')) === 'PEMBENTANGAN', 'presentation label is PEMBENTANGAN');
-check($course->lessonLabel($course->quizLesson()) === 'KUIZ - 10 SOALAN', 'quiz label is KUIZ - 10 SOALAN');
+check($course->lessonLabel($course->lesson('kuiz-modul-1')) === 'KUIZ - 3 SOALAN', 'kuiz-modul-1 label is KUIZ - 3 SOALAN');
+check($course->lessonLabel($course->lesson('kuiz-modul-4')) === 'KUIZ - 1 SOALAN', 'kuiz-modul-4 label is KUIZ - 1 SOALAN');
 $keys = array_map(static function ($l) { return $l['key']; }, $course->lessons());
 check(count($keys) === count(array_unique($keys)), 'lesson keys are unique');
 
+// --- Locking (sequential modules) ---
+$L = static function (string $k) use ($course): array { return $course->lesson($k); };
+$none = [];
+check($course->lockReason($L('pengenalan'), $none, $none) === null, 'pengenalan is always open');
+check($course->lockReason($L('modul-1-pengenalan'), $none, $none) === null, 'modul-1-pengenalan is open from the start');
+$lr = $course->lockReason($L('kuiz-modul-1'), $none, $none);
+check($lr !== null && strpos($lr['message'], 'Sila lengkapkan semua pelajaran dalam Modul 1') === 0
+    && array_column($lr['links'], 'key') === ['modul-1-pengenalan'], 'kuiz-modul-1 locked until modul-1-pengenalan is done (links it)');
+check($course->lockReason($L('kuiz-modul-1'), ['modul-1-pengenalan' => true], $none) === null, 'kuiz-modul-1 opens after modul-1-pengenalan');
+$lr = $course->lockReason($L('modul-2-pengenalan'), ['modul-1-pengenalan' => true], $none);
+check($lr !== null && $lr['message'] === 'Modul ini dikunci. Sila lulus Kuiz Modul 1 terlebih dahulu.'
+    && array_column($lr['links'], 'key') === ['kuiz-modul-1'], 'modul-2-pengenalan locked with no passes (links Kuiz Modul 1)');
+check($course->lockReason($L('kuiz-modul-2'), ['modul-2-pengenalan' => true], $none) !== null, 'kuiz-modul-2 locked while Kuiz Modul 1 unpassed');
+$p1 = $course->effectivePassed(['kuiz-modul-1'], false);
+check($p1 === ['kuiz-modul-1' => true], "effectivePassed(['kuiz-modul-1']) is that quiz only");
+check($course->lockReason($L('modul-2-pengenalan'), $none, $p1) === null, 'modul-2-pengenalan opens after Kuiz Modul 1 is passed');
+check($course->lockReason($L('modul-3-pengenalan'), $none, $p1) !== null, 'modul-3-pengenalan stays locked after only Kuiz Modul 1');
+$p4 = $course->effectivePassed(['kuiz-modul-1', 'kuiz-modul-2', 'kuiz-modul-3', 'kuiz-modul-4'], false);
+$lr = $course->lockReason($L('penutup'), $none, $p4);
+check($lr !== null && $lr['message'] === 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).'
+    && array_column($lr['links'], 'key') === ['kuiz-modul-5'], 'penutup locked until all 5 passed (links first unpassed)');
+check(!$course->allQuizzesPassed($p4) && ($course->firstUnpassedQuiz($p4)['key'] ?? null) === 'kuiz-modul-5', 'firstUnpassedQuiz after 4 passes is kuiz-modul-5');
+$p5 = $course->effectivePassed(['kuiz-modul-5', 'kuiz-modul-1', 'kuiz-modul-2', 'kuiz-modul-3', 'kuiz-modul-4', 'other'], false);
+check($course->allQuizzesPassed($p5) && $course->firstUnpassedQuiz($p5) === null, 'all 5 passed -> allQuizzesPassed');
+check($course->lockReason($L('penutup'), $none, $p5) === null, 'penutup opens after all 5 passed');
+check(count($p5) === 5 && !isset($p5['other']), 'effectivePassed ignores unknown quiz keys');
+$all5 = array_fill_keys($quizKeys, true);
+check($course->effectivePassed([Course::LEGACY_QUIZ_KEY], false) === $all5, "effectivePassed with legacy 'kuiz-akhir' -> all 5 passed");
+check($course->effectivePassed([], true) === $all5, 'effectivePassed with a completion -> all 5 passed');
+check($course->effectivePassed([], false) === [], 'effectivePassed with nothing -> none');
+check($course->lockReason($L('modul-5-pengenalan'), $none, $all5) === null, 'legacy learner: modul-5-pengenalan open');
+check($course->passMark() === 75, 'passMark() is 75');
+
 // --- Quiz data integrity ---
-$quiz = $course->quiz();
-check(($quiz['pass_mark'] ?? null) === 75, 'quiz pass_mark is 75');
-check(count($quiz['questions']) === 10, 'quiz has exactly 10 questions');
-$ids = array_map(static function ($q) { return $q['id']; }, $quiz['questions']);
-check(count($ids) === count(array_unique($ids)), 'quiz question ids are unique');
+$allQuestions = [];
+$counts = [];
+foreach ($quizKeys as $qk) {
+    $qz = $course->quiz($qk);
+    check(($qz['pass_mark'] ?? null) === 75, "$qk pass_mark is 75");
+    check(($qz['title'] ?? null) === $course->lesson($qk)['title'], "$qk quiz title matches the lesson title");
+    $counts[] = count($qz['questions']);
+    $allQuestions = array_merge($allQuestions, $qz['questions']);
+}
+check($counts === [3, 2, 2, 1, 2], 'module quizzes have 3,2,2,1,2 questions');
+check(count($allQuestions) === 10, 'quizzes have 10 questions in total');
+$ids = array_map(static function ($q) { return $q['id']; }, $allQuestions);
+check($ids === ['q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7', 'q8', 'q9', 'q10'], 'question ids q1..q10 in order and unique across quizzes');
 $okOptions = true;
 $okAnswers = true;
-foreach ($quiz['questions'] as $q) {
+foreach ($allQuestions as $q) {
     if (count($q['options']) !== 4 || array_keys($q['options']) !== ['a', 'b', 'c', 'd']) {
         $okOptions = false;
     }
@@ -88,8 +137,14 @@ foreach ($quiz['questions'] as $q) {
 }
 check($okOptions, 'every question has 4 options a-d');
 check($okAnswers, 'every answer key exists in its options');
-check(array_column($quiz['questions'], 'answer') === ['b', 'c', 'c', 'a', 'b', 'a', 'b', 'b', 'c', 'c'], 'quiz answer key is b,c,c,a,b,a,b,b,c,c');
-
+check(array_column($allQuestions, 'answer') === ['b', 'c', 'c', 'a', 'b', 'a', 'b', 'b', 'c', 'c'], 'quiz answer key is b,c,c,a,b,a,b,b,c,c');
+$threw = false;
+try {
+    $course->quiz('modul-1-pengenalan');
+} catch (RuntimeException $ex) {
+    $threw = true;
+}
+check($threw, 'quiz() throws for a non-quiz lesson');
 // --- validate_registration ---
 $valid = [
     'first_name' => 'Ali', 'last_name' => 'Ahmad', 'age' => '30', 'email' => 'ali@example.com',
@@ -130,13 +185,15 @@ $answersWith = static function (array $quiz, int $correct): array {
     }
     return $out;
 };
-$r = grade_quiz($quiz, $answersWith($quiz, 7));
-check($r['correct'] === 7 && $r['total'] === 10 && $r['percent'] === 70.0 && $r['passed'] === false, 'grade_quiz: 7/10 -> 70% and fails');
-$r = grade_quiz($quiz, $answersWith($quiz, 8));
-check($r['correct'] === 8 && $r['percent'] === 80.0 && $r['passed'] === true, 'grade_quiz: 8/10 -> 80% and passes');
-$r = grade_quiz($quiz, $answersWith($quiz, 10));
-check($r['percent'] === 100.0 && $r['passed'] === true, 'grade_quiz: 10/10 -> 100%');
-$small = ['pass_mark' => 75, 'questions' => array_slice($quiz['questions'], 0, 4)];
+$quiz = $course->quiz('kuiz-modul-1');
+$r = grade_quiz($quiz, $answersWith($quiz, 2));
+check($r['correct'] === 2 && $r['total'] === 3 && $r['percent'] === 66.67 && $r['passed'] === false, 'grade_quiz: Kuiz Modul 1 2/3 -> 66.67% and fails');
+$r = grade_quiz($quiz, $answersWith($quiz, 3));
+check($r['correct'] === 3 && $r['percent'] === 100.0 && $r['passed'] === true, 'grade_quiz: Kuiz Modul 1 3/3 -> 100% and passes');
+$quiz2 = $course->quiz('kuiz-modul-2');
+$r = grade_quiz($quiz2, $answersWith($quiz2, 1));
+check($r['correct'] === 1 && $r['total'] === 2 && $r['percent'] === 50.0 && $r['passed'] === false, 'grade_quiz: Kuiz Modul 2 1/2 -> 50% and fails');
+$small = ['pass_mark' => 75, 'questions' => array_slice($allQuestions, 0, 4)];
 $r = grade_quiz($small, $answersWith($small, 3));
 check($r['total'] === 4 && $r['percent'] === 75.0 && $r['passed'] === true, 'grade_quiz: 3/4 -> 75% passes (boundary)');
 $r = grade_quiz($quiz, []);
@@ -144,9 +201,8 @@ check($r['correct'] === 0 && $r['percent'] === 0.0 && $r['passed'] === false && 
 $q1 = $quiz['questions'][0];
 $r = grade_quiz($quiz, ['zz' => 'a', $q1['id'] => 'x', $quiz['questions'][1]['id'] => ['a']]);
 check($r['correct'] === 0 && $r['answers'] === [], 'grade_quiz: unknown qid, unknown option and non-string ignored');
-$r = grade_quiz($quiz, [$q1['id'] => $q1['answer'], 'zz' => 'a']);
-check($r['correct'] === 1 && $r['answers'] === [$q1['id'] => $q1['answer']], 'grade_quiz: sanitized answers keep only known qids');
-
+$r = grade_quiz($quiz, [$q1['id'] => $q1['answer'], 'zz' => 'a', 'q4' => 'a']);
+check($r['correct'] === 1 && $r['answers'] === [$q1['id'] => $q1['answer']], 'grade_quiz: sanitized answers keep only this quiz\'s qids');
 // --- certificate PDF ---
 $pdf = render_certificate_pdf([
     'first_name' => 'Ali', 'last_name' => 'Ahmad', 'course_title' => $course->title(),

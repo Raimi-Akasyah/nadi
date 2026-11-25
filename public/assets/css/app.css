@@ -167,6 +167,11 @@ h1, h2, h3 { line-height: 1.25; }
 .lesson-meta { display: flex; flex-direction: column; }
 .lesson-title { font-size: 0.92rem; }
 .lesson-label { font-size: 0.72rem; color: var(--muted); letter-spacing: 0.5px; text-transform: uppercase; }
+.lesson-row.is-locked { opacity: .65; }
+.lesson-row.is-locked .lesson-tick { border-color: transparent; color: var(--text); font-size: 13px; }
+.lesson-status { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; color: var(--muted); }
+.lesson-status.is-pass { color: var(--success); }
+.section-lock { font-weight: 400; margin-left: 4px; }
 
 .content { flex: 1; padding: 24px 32px; min-width: 0; }
 .lesson-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }

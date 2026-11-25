@@ -6,7 +6,10 @@
 /** @var int $slide */
 /** @var int $slideCount */
 /** @var int $percent */
-/** @var array $missing */
+/** @var array|null $lock */
+/** @var array $passed */
+/** @var bool $allPassed */
+/** @var array|null $nextLesson */
 /** @var array|null $quiz */
 /** @var array|null $attempt */
 /** @var int $attemptNo */
@@ -55,26 +58,34 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                     }
                 }
                 $isCurrentSection = $section['key'] === $lesson['section_key'];
+                $sectionLocked = $sectionLessons !== [] && $course->lockReason($sectionLessons[0], $done, $passed) !== null;
             ?>
                 <details class="sidebar-section" data-section="<?= e($section['key']) ?>"<?= $isCurrentSection ? ' open' : '' ?>>
                     <summary>
-                        <span class="section-title"><?= e($section['title']) ?></span>
+                        <span class="section-title"><?= e($section['title']) ?><?php if ($sectionLocked): ?><span class="section-lock" aria-hidden="true">&#128274;</span><span class="sr-only">(dikunci)</span><?php endif; ?></span>
                         <span class="section-count"><?= e($sectionDone) ?>/<?= e(count($sectionLessons)) ?></span>
                     </summary>
                     <ul class="lesson-list">
                         <?php foreach ($sectionLessons as $l):
                             $isDone = isset($done[$l['key']]);
                             $isCurrent = $l['key'] === $lesson['key'];
+                            $isLocked = $course->lockReason($l, $done, $passed) !== null;
+                            $isQuiz = $l['type'] === 'quiz';
+                            $isPassed = $isQuiz && isset($passed[$l['key']]);
                         ?>
-                            <li class="lesson-row<?= $isCurrent ? ' is-current' : '' ?><?= $isDone ? ' is-done' : '' ?>"
+                            <li class="lesson-row<?= $isCurrent ? ' is-current' : '' ?><?= $isDone ? ' is-done' : '' ?><?= $isLocked ? ' is-locked' : '' ?>"
                                 data-title="<?= e($l['title']) ?>">
                                 <a href="<?= e($lessonUrl($l['key'])) ?>"<?= $isCurrent ? ' aria-current="page"' : '' ?>>
-                                    <span class="lesson-tick" aria-hidden="true"><?= $isDone ? '&#10003;' : '' ?></span>
+                                    <span class="lesson-tick" aria-hidden="true"><?= $isDone ? '&#10003;' : ($isLocked ? '&#128274;' : '') ?></span>
                                     <span class="lesson-meta">
                                         <span class="lesson-title"><?= e($l['title']) ?></span>
                                         <span class="lesson-label"><?= e($course->lessonLabel($l)) ?></span>
+                                        <?php if ($isQuiz): ?>
+                                            <span class="lesson-status<?= $isPassed ? ' is-pass' : '' ?>"><?= $isPassed ? 'LULUS' : 'BELUM LULUS' ?></span>
+                                        <?php endif; ?>
                                     </span>
                                     <?php if ($isDone): ?><span class="sr-only">(selesai)</span><?php endif; ?>
+                                    <?php if ($isLocked): ?><span class="sr-only">(dikunci)</span><?php endif; ?>
                                 </a>
                             </li>
                         <?php endforeach; ?>
@@ -88,7 +99,20 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
         <?php if (!empty($flash)): ?>
             <div class="alert alert-success" role="status"><?= e($flash) ?></div>
         <?php endif; ?>
-        <?php if ($lesson['type'] === 'presentation'): ?>
+        <?php if ($lock !== null): ?>
+            <div class="lesson-header">
+                <h1><?= e($lesson['title']) ?></h1>
+                <span class="lesson-label"><?= e($course->lessonLabel($lesson)) ?></span>
+            </div>
+            <div class="card quiz-gate">
+                <p class="alert alert-warning"><?= e($lock['message']) ?></p>
+                <ul>
+                    <?php foreach ($lock['links'] as $m): ?>
+                        <li><a href="<?= e($lessonUrl($m['key'])) ?>"><?= e($m['title']) ?></a></li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        <?php elseif ($lesson['type'] === 'presentation'): ?>
             <div class="lesson-header">
                 <h1><?= e($lesson['title']) ?></h1>
                 <button type="button" class="btn btn-outline" id="fullscreen-btn">Skrin Penuh</button>
@@ -137,17 +161,6 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                 <h1><?= e($lesson['title']) ?></h1>
                 <span class="lesson-label"><?= e($course->lessonLabel($lesson)) ?></span>
             </div>
-            <?php if (!empty($missing)): ?>
-                <div class="card quiz-gate">
-                    <p class="alert alert-warning">Sila lengkapkan semua modul (Modul 1 hingga Modul 5) sebelum menjawab Kuiz Akhir.</p>
-                    <p>Pelajaran yang belum selesai:</p>
-                    <ul>
-                        <?php foreach ($missing as $m): ?>
-                            <li><a href="<?= e($lessonUrl($m['key'])) ?>"><?= e($m['title']) ?></a></li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php else: ?>
                 <?php if ($completion !== null): ?>
                     <div class="alert alert-success">
                         Kursus ini telah selesai. <a href="certificate.php">Lihat sijil anda</a>.
@@ -164,19 +177,25 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                         <?php if (!$passed): ?>
                             <p>Markah lulus ialah <?= e($quiz['pass_mark']) ?>%. Anda boleh mencuba lagi tanpa had.</p>
                             <a class="btn btn-primary" href="<?= e($lessonUrl($lesson['key'])) ?>">Cuba Lagi</a>
-                        <?php elseif ($completion === null): ?>
+                        <?php elseif ($completion !== null): ?>
+                            <a class="btn btn-primary" href="certificate.php">Lihat Sijil</a>
+                        <?php elseif ($allPassed): ?>
                             <p>Tahniah! Tekan butang di bawah untuk menghantar penyelesaian kursus dan mendapatkan sijil anda.</p>
                             <form method="post" action="complete.php">
                                 <?= csrf_field() ?>
                                 <button type="submit" class="btn btn-primary">LENGKAP &amp; TERUSKAN</button>
                             </form>
                         <?php else: ?>
-                            <a class="btn btn-primary" href="certificate.php">Lihat Sijil</a>
+                            <p>Tahniah! Anda lulus kuiz ini.</p>
+                            <?php if ($nextLesson !== null): ?>
+                                <a class="btn btn-primary" href="<?= e($lessonUrl($nextLesson['key'])) ?>">Teruskan ke <?= e($nextLesson['title']) ?></a>
+                            <?php endif; ?>
                         <?php endif; ?>
                     </div>
                 <?php else: ?>
                     <form method="post" action="quiz-submit.php" class="card quiz-form">
                         <?= csrf_field() ?>
+                        <input type="hidden" name="quiz" value="<?= e($lesson['key']) ?>">
                         <p class="muted">Markah lulus: <?= e($quiz['pass_mark']) ?>% &middot; Percubaan ke-<?= e($attemptNo) ?></p>
                         <?php foreach ($quiz['questions'] as $qi => $q): ?>
                             <fieldset class="quiz-question">
@@ -192,7 +211,6 @@ $lessonUrl = static function (string $key, ?int $slideNo = null): string {
                         <button type="submit" class="btn btn-primary">Hantar Jawapan</button>
                     </form>
                 <?php endif; ?>
-            <?php endif; ?>
         <?php endif; ?>
     </main>
 </div>

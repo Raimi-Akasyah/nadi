@@ -12,7 +12,6 @@
   var COURSE = {
     key: 'ai-essentials',
     title: 'Malaysia AWS AI Essentials',
-    quizRequires: ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'],
     sections: [
       { key: 'pengenalan', title: 'Pengenalan', lessons: [
         { key: 'pengenalan', title: 'Pengenalan', type: 'presentation', slides: [
@@ -25,7 +24,8 @@
           { title: 'Modul 1: Kesedaran AI & Keyakinan Digital', image: 'assets/slides/page-08.webp' },
           { title: 'Apakah Itu Kecerdasan Buatan (AI)?', image: 'assets/slides/page-09.webp' },
           { title: 'AI Bukan Pengganti Kita, Tapi Pembantu Kita', image: 'assets/slides/page-10.webp' }
-        ] }
+        ] },
+        { key: 'kuiz-modul-1', title: 'Kuiz Modul 1', type: 'quiz', quiz: 'modul-1' }
       ] },
       { key: 'modul-2', title: 'Modul 2: Asas AI', lessons: [
         { key: 'modul-2-pengenalan', title: 'Asas AI', type: 'presentation', slides: [
@@ -33,7 +33,8 @@
           { title: 'Macam Mana AI Belajar?', image: 'assets/slides/page-12.webp' },
           { title: 'Apakah Itu AI Generatif?', image: 'assets/slides/page-13.webp' },
           { title: '\'Perangai\' Pekerja Baru AI Kita', image: 'assets/slides/page-14.webp' }
-        ] }
+        ] },
+        { key: 'kuiz-modul-2', title: 'Kuiz Modul 2', type: 'quiz', quiz: 'modul-2' }
       ] },
       { key: 'modul-3', title: 'Modul 3: Kemahiran Praktikal AI', lessons: [
         { key: 'modul-3-pengenalan', title: 'Kemahiran Praktikal AI', type: 'presentation', slides: [
@@ -46,7 +47,8 @@
           { title: '3 Peranan Utama AI untuk Bisnes Anda', image: 'assets/slides/page-21.webp' },
           { title: 'Latihan Berkumpulan: Selesaikan Krisis \'Sales Turun\' (bisnes.ai)', image: 'assets/slides/page-22.webp' },
           { title: 'Latihan Berkumpulan: Selesaikan Krisis \'Sales Turun\' (3 Langkah)', image: 'assets/slides/page-23.webp' }
-        ] }
+        ] },
+        { key: 'kuiz-modul-3', title: 'Kuiz Modul 3', type: 'quiz', quiz: 'modul-3' }
       ] },
       { key: 'modul-4', title: 'Modul 4: AI untuk Perniagaan Mikro & Produktiviti', lessons: [
         { key: 'modul-4-pengenalan', title: 'AI untuk Perniagaan Mikro', type: 'presentation', slides: [
@@ -62,7 +64,8 @@
           { title: 'Langkah 6: Skrip Video Promosi (30 Saat)', image: 'assets/slides/page-33.webp' },
           { title: 'Langkah 6: Skrip Video Promosi (Prompt KOPI)', image: 'assets/slides/page-34.webp' },
           { title: 'Jom Hasilkan Aplikasi (PartyRock)', image: 'assets/slides/page-35.webp' }
-        ] }
+        ] },
+        { key: 'kuiz-modul-4', title: 'Kuiz Modul 4', type: 'quiz', quiz: 'modul-4' }
       ] },
       { key: 'modul-5', title: 'Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan', lessons: [
         { key: 'modul-5-pengenalan', title: 'AI Bertanggungjawab', type: 'presentation', slides: [
@@ -73,10 +76,8 @@
           { title: 'Apa Maksud \'Kerja Freelance\'?', image: 'assets/slides/page-40.webp' },
           { title: 'Kenali 4 Alat AI yang Akan Membantu Anda', image: 'assets/slides/page-41.webp' },
           { title: 'Teruskan Pembelajaran Anda Selepas Bengkel Ini', image: 'assets/slides/page-42.webp' }
-        ] }
-      ] },
-      { key: 'kuiz-akhir', title: 'Kuiz Akhir', lessons: [
-        { key: 'kuiz-akhir', title: 'Kuiz Akhir', type: 'quiz' }
+        ] },
+        { key: 'kuiz-modul-5', title: 'Kuiz Modul 5', type: 'quiz', quiz: 'modul-5' }
       ] },
       { key: 'penutup', title: 'Penutup', lessons: [
         { key: 'penutup', title: 'Penutup', type: 'presentation', slides: [
@@ -88,30 +89,39 @@
 
   // In this draft the answers are in the browser. The real portal grades on the server.
   var QUIZ = {
-    title: 'Kuiz Akhir',
     passMark: 75,
-    questions: [
-      { id: 'q1', text: 'Apakah maksud singkatan "AI"?', answer: 'b',
-        options: { a: 'Automasi Internet', b: 'Kecerdasan Buatan (Artificial Intelligence)', c: 'Aplikasi Interaktif', d: 'Analisis Imej' } },
-      { id: 'q2', text: 'Antara berikut, yang manakah contoh penggunaan AI dalam kehidupan harian?', answer: 'c',
-        options: { a: 'Kalkulator biasa', b: 'Lampu suluh', c: 'Cadangan video di aplikasi penstriman', d: 'Jam dinding' } },
-      { id: 'q3', text: 'Apakah langkah terbaik untuk meningkatkan keyakinan digital?', answer: 'c',
-        options: { a: 'Mengelak semua teknologi baharu', b: 'Berkongsi kata laluan dengan rakan', c: 'Belajar dan mencuba alat digital secara berperingkat', d: 'Hanya bergantung kepada orang lain' } },
-      { id: 'q4', text: 'Pembelajaran mesin (machine learning) ialah...', answer: 'a',
-        options: { a: 'Cabang AI di mana komputer belajar daripada data', b: 'Proses membaiki mesin rosak', c: 'Kursus menaip pantas', d: 'Perisian antivirus' } },
-      { id: 'q5', text: 'Apakah yang diperlukan oleh model AI untuk belajar?', answer: 'b',
-        options: { a: 'Elektrik sahaja', b: 'Data', c: 'Kertas', d: 'Tiada apa-apa' } },
-      { id: 'q6', text: 'Apakah "prompt" dalam konteks alat AI generatif?', answer: 'a',
-        options: { a: 'Arahan atau soalan yang diberikan kepada AI', b: 'Jenis virus komputer', c: 'Butang untuk menutup aplikasi', d: 'Kabel sambungan internet' } },
-      { id: 'q7', text: 'Bagaimanakah cara terbaik untuk mendapatkan jawapan yang lebih tepat daripada AI?', answer: 'b',
-        options: { a: 'Menulis arahan yang ringkas tetapi kabur', b: 'Memberikan arahan yang jelas dan konteks yang mencukupi', c: 'Menggunakan huruf besar sahaja', d: 'Bertanya soalan yang sama berulang kali tanpa perubahan' } },
-      { id: 'q8', text: 'Bagaimanakah AI boleh membantu perniagaan mikro?', answer: 'b',
-        options: { a: 'Menggantikan semua pelanggan', b: 'Menghasilkan kandungan pemasaran dan menjimatkan masa', c: 'Menghapuskan keperluan menyimpan rekod', d: 'Menjamin keuntungan setiap bulan' } },
-      { id: 'q9', text: 'Apakah yang perlu dilakukan sebelum berkongsi maklumat yang dihasilkan oleh AI?', answer: 'c',
-        options: { a: 'Terus kongsi tanpa semakan', b: 'Padam semua sumber', c: 'Semak ketepatan maklumat tersebut', d: 'Tukar fon tulisan' } },
-      { id: 'q10', text: 'Antara berikut, yang manakah amalan AI yang bertanggungjawab?', answer: 'c',
-        options: { a: 'Memasukkan data peribadi orang lain tanpa izin', b: 'Menggunakan AI untuk menyebarkan berita palsu', c: 'Melindungi privasi dan menggunakan AI secara beretika', d: 'Mempercayai semua output AI sepenuhnya' } }
-    ]
+    quizzes: {
+      'modul-1': { title: 'Kuiz Modul 1', questions: [
+        { id: 'q1', text: 'Apakah maksud singkatan "AI"?', answer: 'b',
+          options: { a: 'Automasi Internet', b: 'Kecerdasan Buatan (Artificial Intelligence)', c: 'Aplikasi Interaktif', d: 'Analisis Imej' } },
+        { id: 'q2', text: 'Antara berikut, yang manakah contoh penggunaan AI dalam kehidupan harian?', answer: 'c',
+          options: { a: 'Kalkulator biasa', b: 'Lampu suluh', c: 'Cadangan video di aplikasi penstriman', d: 'Jam dinding' } },
+        { id: 'q3', text: 'Apakah langkah terbaik untuk meningkatkan keyakinan digital?', answer: 'c',
+          options: { a: 'Mengelak semua teknologi baharu', b: 'Berkongsi kata laluan dengan rakan', c: 'Belajar dan mencuba alat digital secara berperingkat', d: 'Hanya bergantung kepada orang lain' } }
+      ] },
+      'modul-2': { title: 'Kuiz Modul 2', questions: [
+        { id: 'q4', text: 'Pembelajaran mesin (machine learning) ialah...', answer: 'a',
+          options: { a: 'Cabang AI di mana komputer belajar daripada data', b: 'Proses membaiki mesin rosak', c: 'Kursus menaip pantas', d: 'Perisian antivirus' } },
+        { id: 'q5', text: 'Apakah yang diperlukan oleh model AI untuk belajar?', answer: 'b',
+          options: { a: 'Elektrik sahaja', b: 'Data', c: 'Kertas', d: 'Tiada apa-apa' } }
+      ] },
+      'modul-3': { title: 'Kuiz Modul 3', questions: [
+        { id: 'q6', text: 'Apakah "prompt" dalam konteks alat AI generatif?', answer: 'a',
+          options: { a: 'Arahan atau soalan yang diberikan kepada AI', b: 'Jenis virus komputer', c: 'Butang untuk menutup aplikasi', d: 'Kabel sambungan internet' } },
+        { id: 'q7', text: 'Bagaimanakah cara terbaik untuk mendapatkan jawapan yang lebih tepat daripada AI?', answer: 'b',
+          options: { a: 'Menulis arahan yang ringkas tetapi kabur', b: 'Memberikan arahan yang jelas dan konteks yang mencukupi', c: 'Menggunakan huruf besar sahaja', d: 'Bertanya soalan yang sama berulang kali tanpa perubahan' } }
+      ] },
+      'modul-4': { title: 'Kuiz Modul 4', questions: [
+        { id: 'q8', text: 'Bagaimanakah AI boleh membantu perniagaan mikro?', answer: 'b',
+          options: { a: 'Menggantikan semua pelanggan', b: 'Menghasilkan kandungan pemasaran dan menjimatkan masa', c: 'Menghapuskan keperluan menyimpan rekod', d: 'Menjamin keuntungan setiap bulan' } }
+      ] },
+      'modul-5': { title: 'Kuiz Modul 5', questions: [
+        { id: 'q9', text: 'Apakah yang perlu dilakukan sebelum berkongsi maklumat yang dihasilkan oleh AI?', answer: 'c',
+          options: { a: 'Terus kongsi tanpa semakan', b: 'Padam semua sumber', c: 'Semak ketepatan maklumat tersebut', d: 'Tukar fon tulisan' } },
+        { id: 'q10', text: 'Antara berikut, yang manakah amalan AI yang bertanggungjawab?', answer: 'c',
+          options: { a: 'Memasukkan data peribadi orang lain tanpa izin', b: 'Menggunakan AI untuk menyebarkan berita palsu', c: 'Melindungi privasi dan menggunakan AI secara beretika', d: 'Mempercayai semua output AI sepenuhnya' } }
+      ] }
+    }
   };
 
   var ISSUER = 'NADI'; // PDF author only
@@ -149,12 +159,72 @@
     for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].key === key) return LESSONS[i + 1] || null;
     return null;
   }
-  function quizLesson() {
-    for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].type === 'quiz') return LESSONS[i];
+  function sectionLessons(key) {
+    return LESSONS.filter(function (l) { return l.sectionKey === key; });
+  }
+  function sectionIndex(key) {
+    for (var i = 0; i < COURSE.sections.length; i++) if (COURSE.sections[i].key === key) return i;
+    return -1;
+  }
+  var QUIZ_LESSONS = LESSONS.filter(function (l) { return l.type === 'quiz'; });
+  var LAST_QUIZ = QUIZ_LESSONS[QUIZ_LESSONS.length - 1];
+  // Attempts saved before the module quizzes have no quiz key: they were the old Kuiz Akhir (all 10 questions).
+  var LEGACY_QUIZ_KEY = 'kuiz-akhir';
+  function quizOf(lesson) { return QUIZ.quizzes[lesson.quiz]; }
+  function lessonLabel(l) {
+    return l.type === 'quiz' ? 'KUIZ - ' + quizOf(l).questions.length + ' SOALAN' : 'PEMBENTANGAN';
+  }
+  // Passed quiz lessons (key -> true). A completion or a passed legacy attempt counts as all passed
+  // (Course::effectivePassed in src/Course.php).
+  function passedSet() {
+    var legacy = !!state.completion || state.attempts.some(function (a) {
+      return a.passed && (!a.quiz || a.quiz === LEGACY_QUIZ_KEY);
+    });
+    var out = {};
+    QUIZ_LESSONS.forEach(function (l) {
+      if (legacy || state.attempts.some(function (a) { return a.passed && a.quiz === l.key; })) out[l.key] = true;
+    });
+    return out;
+  }
+  // Completed lessons; a passed quiz counts as completed (as in public/course.php).
+  function doneSet(passed) {
+    var out = {};
+    Object.keys(state.done).forEach(function (k) { if (state.done[k]) out[k] = true; });
+    Object.keys(passed).forEach(function (k) { out[k] = true; });
+    return out;
+  }
+  function firstUnpassedQuiz(passed) {
+    for (var i = 0; i < QUIZ_LESSONS.length; i++) if (!passed[QUIZ_LESSONS[i].key]) return QUIZ_LESSONS[i];
     return null;
   }
-  function lessonLabel(l) {
-    return l.type === 'quiz' ? 'KUIZ - ' + QUIZ.questions.length + ' SOALAN' : 'PEMBENTANGAN';
+  function allQuizzesPassed(passed) { return firstUnpassedQuiz(passed) === null; }
+  // Why a lesson is locked ({ message, links }) or null when open. Same rules as Course::lockReason().
+  function lockReason(lesson, done, passed) {
+    if (!QUIZ_LESSONS.length) return null;
+    var own = sectionIndex(lesson.sectionKey);
+    var prevQuiz = null;
+    QUIZ_LESSONS.forEach(function (q) { if (sectionIndex(q.sectionKey) < own) prevQuiz = q; });
+    if (own > sectionIndex(LAST_QUIZ.sectionKey)) {
+      var first = firstUnpassedQuiz(passed);
+      return first ? { message: 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).', links: [first] } : null;
+    }
+    if (prevQuiz && !passed[prevQuiz.key]) {
+      return { message: 'Modul ini dikunci. Sila lulus ' + prevQuiz.title + ' terlebih dahulu.', links: [prevQuiz] };
+    }
+    if (lesson.type === 'quiz') {
+      var missing = sectionLessons(lesson.sectionKey).filter(function (l) { return l.type !== 'quiz' && !done[l.key]; });
+      if (missing.length) {
+        return {
+          message: 'Sila lengkapkan semua pelajaran dalam ' + COURSE.sections[own].title + ' sebelum menjawab kuiz ini.',
+          links: missing
+        };
+      }
+    }
+    return null;
+  }
+  function currentLock(lesson) {
+    var passed = passedSet();
+    return lockReason(lesson, doneSet(passed), passed);
   }
 
   // ---- State ----
@@ -314,7 +384,7 @@
     }
     if (r.path === '/sijil') {
       if (!state.learner) return go('#/daftar');
-      if (!state.completion) return go(courseHref(quizLesson().key));
+      if (!state.completion) return go(courseHref((firstUnpassedQuiz(passedSet()) || LAST_QUIZ).key));
       return renderCertificate();
     }
     return renderLanding();
@@ -353,8 +423,8 @@
       '<p class="eyebrow">Kursus Dalam Talian NADI</p>' +
       '<h1>' + e(COURSE.title) + '</h1>' +
       '<p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri. ' +
-      'Lengkapkan kelima-lima modul, lulus Kuiz Akhir dengan markah sekurang-kurangnya ' + QUIZ.passMark +
-      '%, dan muat turun sijil penyelesaian anda serta-merta.</p>' + actions +
+      'Lengkapkan kelima-lima modul dan lulus kuiz di hujung setiap modul dengan markah sekurang-kurangnya ' + QUIZ.passMark +
+      '% untuk muat turun sijil penyelesaian anda.</p>' + actions +
       '</div></section>' + resumeCard +
       '<section class="container"><h2>Kandungan Kursus</h2><ol class="section-list">' + list + '</ol></section></main>');
     var reset = document.getElementById('reset-btn');
@@ -453,8 +523,10 @@
         '<p>Pelajaran tidak dijumpai.</p><p><a href="#/kursus">Kembali ke kursus</a></p></div></main>');
       return;
     }
+    var passed = passedSet();
+    var done = doneSet(passed);
     if (!lesson) {
-      for (var i = 0; i < LESSONS.length && !lesson; i++) if (!state.done[LESSONS[i].key]) lesson = LESSONS[i];
+      for (var i = 0; i < LESSONS.length && !lesson; i++) if (!done[LESSONS[i].key]) lesson = LESSONS[i];
       if (!lesson) lesson = LESSONS[0];
     }
     var slideCount = lesson.type === 'presentation' ? lesson.slides.length : 0;
@@ -463,28 +535,39 @@
       var req = parseInt(params.slide, 10);
       slide = Math.max(1, Math.min(slideCount, isNaN(req) ? 1 : req));
     }
-    var doneCount = LESSONS.filter(function (l) { return state.done[l.key]; }).length;
+    var doneCount = LESSONS.filter(function (l) { return done[l.key]; }).length;
     var percent = Math.round(doneCount * 100 / LESSONS.length);
 
     var sidebar = COURSE.sections.map(function (s) {
-      var sDone = s.lessons.filter(function (l) { return state.done[l.key]; }).length;
-      var rows = s.lessons.map(function (l) {
-        var isDone = !!state.done[l.key];
+      var sLessons = sectionLessons(s.key);
+      var sDone = sLessons.filter(function (l) { return done[l.key]; }).length;
+      var sLocked = sLessons.length > 0 && lockReason(sLessons[0], done, passed) !== null;
+      var rows = sLessons.map(function (l) {
+        var isDone = !!done[l.key];
         var isCurrent = l.key === lesson.key;
-        return '<li class="lesson-row' + (isCurrent ? ' is-current' : '') + (isDone ? ' is-done' : '') + '" data-title="' + e(l.title) + '">' +
+        var isLocked = lockReason(l, done, passed) !== null;
+        var isPassed = l.type === 'quiz' && !!passed[l.key];
+        return '<li class="lesson-row' + (isCurrent ? ' is-current' : '') + (isDone ? ' is-done' : '') + (isLocked ? ' is-locked' : '') +
+          '" data-title="' + e(l.title) + '">' +
           '<a href="' + courseHref(l.key) + '"' + (isCurrent ? ' aria-current="page"' : '') + '>' +
-          '<span class="lesson-tick" aria-hidden="true">' + (isDone ? '&#10003;' : '') + '</span>' +
+          '<span class="lesson-tick" aria-hidden="true">' + (isDone ? '&#10003;' : (isLocked ? '&#128274;' : '')) + '</span>' +
           '<span class="lesson-meta"><span class="lesson-title">' + e(l.title) + '</span>' +
-          '<span class="lesson-label">' + e(lessonLabel(l)) + '</span></span>' +
-          (isDone ? '<span class="sr-only">(selesai)</span>' : '') + '</a></li>';
+          '<span class="lesson-label">' + e(lessonLabel(l)) + '</span>' +
+          (l.type === 'quiz' ? '<span class="lesson-status' + (isPassed ? ' is-pass' : '') + '">' + (isPassed ? 'LULUS' : 'BELUM LULUS') + '</span>' : '') +
+          '</span>' +
+          (isDone ? '<span class="sr-only">(selesai)</span>' : '') +
+          (isLocked ? '<span class="sr-only">(dikunci)</span>' : '') + '</a></li>';
       }).join('');
       return '<details class="sidebar-section" data-section="' + e(s.key) + '"' + (s.key === lesson.sectionKey ? ' open' : '') + '>' +
-        '<summary><span class="section-title">' + e(s.title) + '</span>' +
+        '<summary><span class="section-title">' + e(s.title) +
+        (sLocked ? '<span class="section-lock" aria-hidden="true">&#128274;</span><span class="sr-only">(dikunci)</span>' : '') + '</span>' +
         '<span class="section-count">' + sDone + '/' + s.lessons.length + '</span></summary>' +
         '<ul class="lesson-list">' + rows + '</ul></details>';
     }).join('');
 
-    var main = lesson.type === 'presentation' ? presentationHtml(lesson, slide, slideCount) : quizHtml(lesson, params);
+    var lock = lockReason(lesson, done, passed);
+    var main = lock ? lockHtml(lesson, lock)
+      : (lesson.type === 'presentation' ? presentationHtml(lesson, slide, slideCount) : quizHtml(lesson, params, passed));
 
     document.body.className = 'course-page';
     setPage(lesson.title,
@@ -503,8 +586,18 @@
 
     document.getElementById('topbar-signout-btn').addEventListener('click', signOut);
     bindSearch();
+    if (lock) return;
     if (lesson.type === 'presentation') bindViewer(lesson, slide, slideCount);
     else bindQuiz(lesson);
+  }
+
+  // A locked lesson (the portal answers 403 with this card).
+  function lockHtml(lesson, lock) {
+    return '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
+      '<span class="lesson-label">' + e(lessonLabel(lesson)) + '</span></div>' +
+      '<div class="card quiz-gate" id="lock-card"><p class="alert alert-warning">' + e(lock.message) + '</p><ul>' +
+      lock.links.map(function (m) { return '<li><a href="' + courseHref(m.key) + '">' + e(m.title) + '</a></li>'; }).join('') +
+      '</ul></div>';
   }
 
   function presentationHtml(lesson, slide, slideCount) {
@@ -562,6 +655,7 @@
     document.getElementById('complete-form').addEventListener('submit', function (ev) {
       ev.preventDefault();
       if (current !== count) return;
+      if (currentLock(lesson)) return go(courseHref(lesson.key));
       state.done[lesson.key] = true;
       save();
       var next = nextLesson(lesson.key);
@@ -610,33 +704,21 @@
     });
   }
 
-  // ---- Final quiz ----
-  function missingForQuiz() {
-    return LESSONS.filter(function (l) {
-      return l.type === 'presentation' && COURSE.quizRequires.indexOf(l.sectionKey) !== -1 && !state.done[l.key];
-    });
-  }
+  // ---- Module quizzes ----
   function formatPercent(p) { return String(Math.round(p * 100) / 100); }
 
-  function quizHtml(lesson, params) {
-    var head = '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
+  function quizHtml(lesson, params, passed) {
+    var quiz = quizOf(lesson);
+    var html = '<div class="lesson-header"><h1>' + e(lesson.title) + '</h1>' +
       '<span class="lesson-label">' + e(lessonLabel(lesson)) + '</span></div>';
-    var missing = missingForQuiz();
-    if (missing.length) {
-      return head + '<div class="card quiz-gate">' +
-        '<p class="alert alert-warning">Sila lengkapkan semua modul (Modul 1 hingga Modul 5) sebelum menjawab Kuiz Akhir.</p>' +
-        '<p>Pelajaran yang belum selesai:</p><ul>' +
-        missing.map(function (m) { return '<li><a href="' + courseHref(m.key) + '">' + e(m.title) + '</a></li>'; }).join('') +
-        '</ul></div>';
-    }
-    var html = head;
+    var mine = state.attempts.filter(function (a) { return a.quiz === lesson.key; });
     if (state.completion) {
       html += '<div class="alert alert-success">Kursus ini telah selesai. <a href="#/sijil">Lihat sijil anda</a>.</div>';
     }
     var attempt = null;
     if (params.attempt) {
       var id = parseInt(params.attempt, 10);
-      attempt = state.attempts.filter(function (a) { return a.id === id; })[0] || null;
+      attempt = mine.filter(function (a) { return a.id === id; })[0] || null;
     }
     if (attempt) {
       html += '<div class="card quiz-result ' + (attempt.passed ? 'is-pass' : 'is-fail') + '">' +
@@ -645,23 +727,27 @@
       if (!attempt.passed) {
         html += '<p>Markah lulus ialah ' + QUIZ.passMark + '%. Anda boleh mencuba lagi tanpa had.</p>' +
           '<a class="btn btn-primary" href="' + courseHref(lesson.key) + '">Cuba Lagi</a>';
-      } else if (!state.completion) {
+      } else if (state.completion) {
+        html += '<a class="btn btn-primary" href="#/sijil">Lihat Sijil</a>';
+      } else if (allQuizzesPassed(passed)) {
         html += '<p>Tahniah! Tekan butang di bawah untuk menghantar penyelesaian kursus dan mendapatkan sijil anda.</p>' +
           '<form id="finish-form"><button type="submit" class="btn btn-primary">LENGKAP &amp; TERUSKAN</button></form>';
       } else {
-        html += '<a class="btn btn-primary" href="#/sijil">Lihat Sijil</a>';
+        var next = nextLesson(lesson.key);
+        html += '<p>Tahniah! Anda lulus kuiz ini.</p>' +
+          (next ? '<a class="btn btn-primary" id="next-lesson-btn" href="' + courseHref(next.key) + '">Teruskan ke ' + e(next.title) + '</a>' : '');
       }
       return html + '</div>';
     }
-    var qs = QUIZ.questions.map(function (q, qi) {
+    var qs = quiz.questions.map(function (q, qi) {
       var opts = Object.keys(q.options).map(function (k) {
         return '<label class="quiz-option"><input type="radio" name="' + e(q.id) + '" value="' + e(k) + '" required>' +
           '<span>' + e(q.options[k]) + '</span></label>';
       }).join('');
       return '<fieldset class="quiz-question"><legend>' + (qi + 1) + '. ' + e(q.text) + '</legend>' + opts + '</fieldset>';
     }).join('');
-    return html + '<form class="card quiz-form" id="quiz-form">' +
-      '<p class="muted">Markah lulus: ' + QUIZ.passMark + '% &middot; Percubaan ke-' + (state.attempts.length + 1) + '</p>' +
+    return html + '<form class="card quiz-form" id="quiz-form" data-quiz="' + e(lesson.key) + '">' +
+      '<p class="muted">Markah lulus: ' + QUIZ.passMark + '% &middot; Percubaan ke-' + (mine.length + 1) + '</p>' +
       qs + '<button type="submit" class="btn btn-primary">Hantar Jawapan</button></form>';
   }
 
@@ -670,15 +756,19 @@
     if (form) {
       form.addEventListener('submit', function (ev) {
         ev.preventDefault();
+        if (currentLock(lesson)) return go(courseHref(lesson.key));
+        var questions = quizOf(lesson).questions;
         var correct = 0;
-        QUIZ.questions.forEach(function (q) {
+        questions.forEach(function (q) {
           var picked = form.querySelector('input[name="' + q.id + '"]:checked');
           if (picked && picked.value === q.answer) correct++;
         });
-        var total = QUIZ.questions.length;
-        var percent = correct * 100 / total;
+        var total = questions.length;
+        var percent = Math.round(correct * 10000 / total) / 100;
         var id = state.attempts.length + 1;
-        state.attempts.push({ id: id, correct: correct, total: total, percent: percent, passed: percent >= QUIZ.passMark });
+        var passedNow = percent >= QUIZ.passMark;
+        state.attempts.push({ id: id, quiz: lesson.key, correct: correct, total: total, percent: percent, passed: passedNow });
+        if (passedNow) state.done[lesson.key] = true;
         save();
         go(courseHref(lesson.key) + '&attempt=' + id);
       });
@@ -687,10 +777,9 @@
     if (finish) {
       finish.addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var passed = state.attempts.some(function (a) { return a.passed; });
-        if (!passed) return go(courseHref(lesson.key));
+        var first = firstUnpassedQuiz(passedSet());
+        if (first) return go(courseHref(first.key));
         if (!state.completion) state.completion = { code: randomCode(), completedAt: todayIso() };
-        state.done[lesson.key] = true;
         save();
         go('#/sijil');
       });
@@ -716,7 +805,7 @@
       'tidak dipaparkan kepada pengguna seterusnya pada peranti ini. Di komputer awam, simpan fail sijil ' +
       'ke telefon atau e-mel anda dan padamkan salinan daripada komputer tersebut.</p>' +
       '<p class="muted small">Ini sijil contoh daripada draf pratonton. Pengesahan sijil hanya tersedia dalam portal sebenar.</p>' +
-      '<p><a href="' + courseHref(quizLesson().key) + '">Kembali ke kursus</a></p>' +
+      '<p><a href="' + courseHref(LAST_QUIZ.key) + '">Kembali ke kursus</a></p>' +
       '</div></main>');
     document.getElementById('signout-btn').addEventListener('click', signOut);
     document.getElementById('download-btn').addEventListener('click', function () {

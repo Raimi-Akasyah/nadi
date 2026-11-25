@@ -7,7 +7,9 @@ $learner = require_learner();
 $course = Course::load();
 $completion = completion_find((int)$learner['id'], $course->key());
 if ($completion === null) {
-    redirect('course.php?' . http_build_query(['lesson' => $course->quizLesson()['key']]));
+    $quizzes = $course->quizLessons();
+    $target = $course->firstUnpassedQuiz(learner_passed_quizzes($course, (int)$learner['id'])) ?? $quizzes[count($quizzes) - 1];
+    redirect('course.php?' . http_build_query(['lesson' => $target['key']]));
 }
 
 render('certificate', [

@@ -5,7 +5,10 @@ require __DIR__ . '/../src/bootstrap.php';
 
 $learner = require_learner();
 $course = Course::load();
-$done = array_flip(progress_keys((int)$learner['id']));
+$learnerId = (int)$learner['id'];
+$passed = learner_passed_quizzes($course, $learnerId);
+// A passed quiz counts as a completed lesson (also for learners who passed the old Kuiz Akhir).
+$done = array_flip(progress_keys($learnerId)) + $passed;
 
 $lessonKey = $_GET['lesson'] ?? null;
 if ($lessonKey === null || $lessonKey === '') {
@@ -42,28 +45,22 @@ foreach ($allLessons as $l) {
 }
 $percent = count($allLessons) > 0 ? (int)round($completedCount * 100 / count($allLessons)) : 0;
 
-$missing = [];
-if ($lesson['type'] === 'quiz') {
-    foreach ($course->quizRequiredLessons() as $l) {
-        if (!isset($done[$l['key']])) {
-            $missing[] = $l;
-        }
-    }
-}
+$lock = $course->lockReason($lesson, $done, $passed);
 
 $quiz = null;
 $attempt = null;
 $attemptNo = 0;
 $completion = null;
-if ($lesson['type'] === 'quiz' && $missing === []) {
-    $quiz = $course->quiz();
-    $learnerId = (int)$learner['id'];
+if ($lock !== null) {
+    http_response_code(403);
+} elseif ($lesson['type'] === 'quiz') {
+    $quiz = $course->quiz($lesson['key']);
     $completion = completion_find($learnerId, $course->key());
-    $attemptNo = attempt_count($learnerId, $course->key()) + 1;
+    $attemptNo = attempt_count($learnerId, $course->key(), $lesson['key']) + 1;
     $attemptId = filter_var($_GET['attempt'] ?? null, FILTER_VALIDATE_INT);
     if ($attemptId !== false && $attemptId !== null) {
         $attempt = attempt_find((int)$attemptId, $learnerId);
-        if ($attempt === null) {
+        if ($attempt === null || $attempt['quiz_key'] !== $lesson['key']) {
             abort(404, 'Percubaan kuiz tidak dijumpai.');
         }
     }
@@ -81,7 +78,10 @@ render('course', [
     'slide'      => $slide,
     'slideCount' => $slideCount,
     'percent'    => $percent,
-    'missing'    => $missing,
+    'lock'       => $lock,
+    'passed'     => $passed,
+    'allPassed'  => $course->allQuizzesPassed($passed),
+    'nextLesson' => $course->nextLesson($lesson['key']),
     'quiz'       => $quiz,
     'attempt'    => $attempt,
     'attemptNo'  => $attemptNo,

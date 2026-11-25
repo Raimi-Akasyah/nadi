@@ -209,6 +209,15 @@ function resume_attempt_allowed(string $email): bool
     return true;
 }
 
+/** The learner's passed quiz lessons (map key => true), counting the legacy Kuiz Akhir and a completion as all passed. */
+function learner_passed_quizzes(Course $course, int $learnerId): array
+{
+    return $course->effectivePassed(
+        quiz_passed_keys($learnerId, $course->key()),
+        completion_find($learnerId, $course->key()) !== null
+    );
+}
+
 /** Store a one-time message for the next page. */
 function flash_set(string $message): void
 {

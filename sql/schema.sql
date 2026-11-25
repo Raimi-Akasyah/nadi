@@ -53,10 +53,14 @@ CREATE TABLE IF NOT EXISTS lesson_progress (
         REFERENCES learners (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- quiz_key = the quiz lesson key (kuiz-modul-1 ... kuiz-modul-5). 'kuiz-akhir' marks attempts of the old
+-- single final quiz (all 10 questions); a passed one counts as all module quizzes passed.
+-- Existing databases: import sql/migrate-module-quizzes.sql to add this column.
 CREATE TABLE IF NOT EXISTS quiz_attempts (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
     learner_id INT UNSIGNED NOT NULL,
     course_key VARCHAR(64) NOT NULL,
+    quiz_key VARCHAR(64) NOT NULL DEFAULT 'kuiz-akhir',
     correct_count TINYINT UNSIGNED NOT NULL,
     total_questions TINYINT UNSIGNED NOT NULL,
     score_percent DECIMAL(5,2) NOT NULL,
@@ -65,6 +69,7 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     KEY idx_attempts_learner_course (learner_id, course_key),
+    KEY idx_attempts_learner_quiz (learner_id, quiz_key),
     CONSTRAINT fk_attempts_learner FOREIGN KEY (learner_id)
         REFERENCES learners (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

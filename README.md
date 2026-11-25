@@ -2,7 +2,7 @@
 
 A small learning portal for the NADI community course "Malaysia AWS AI Essentials".
 
-Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account or password. A learner who comes back later, on the same or another device, continues with "Sambung Semula" by entering only their e-mail (see [Continuing later: Sambung Semula](#continuing-later-sambung-semula) and [Shared computers and own devices](#shared-computers-and-own-devices)). They then go through Modul 1 to Modul 5 in a slide viewer and take a 10-question final quiz (Kuiz Akhir). A score of at least 75% passes, and attempts are unlimited. After passing, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
+Learners register once with their details (first name, last name, age, e-mail, phone, address, occupation). There is no account or password. A learner who comes back later, on the same or another device, continues with "Sambung Semula" by entering only their e-mail (see [Continuing later: Sambung Semula](#continuing-later-sambung-semula) and [Shared computers and own devices](#shared-computers-and-own-devices)). They then go through Modul 1 to Modul 5 in a slide viewer. Each module ends with its own quiz (Kuiz Modul 1 to Kuiz Modul 5). A score of at least 75% passes, and attempts are unlimited. The modules open in order: Modul 2 opens after Kuiz Modul 1 is passed, and so on. After all five module quizzes are passed, "LENGKAP & TERUSKAN" records the course completion and the learner can download a PDF certificate with their first and last name, the completion date and a unique certificate number. Anyone can check that number on the public verification page.
 
 Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 
@@ -15,7 +15,7 @@ Plain PHP 8 and MySQL/MariaDB. No framework, no Composer and no build step.
 | `views/` | HTML templates. |
 | `content/` | `course.php` (sections, lessons, slides), `quiz.php` (questions, answers, pass mark) and `certificate.php` (certificate template path and the positions of the name, date and certificate number). |
 | `config/` | `config.example.php`. Your real `config.php` goes here and is not committed. |
-| `sql/` | `schema.sql`, imported once with phpMyAdmin. |
+| `sql/` | `schema.sql`, imported once with phpMyAdmin, and `migrate-module-quizzes.sql` for sites created before the module quizzes. |
 | `lib/fpdf/` | FPDF 1.86, used to build the certificate PDF. |
 | `tests/` | `lint.ps1`, `unit.php`, `e2e.php`, `docs-check.mjs` (headless-browser check of `docs/`), `render-cert.php` (sample certificates for a visual check). |
 
@@ -29,7 +29,7 @@ Every folder except `public/` has an `.htaccess` with `Require all denied`, as a
 ## Deploying on Plesk
 
 1. **Create the database.** Websites & Domains → Databases → Add Database. Enter a database name, then create a database user and password. Note the host (usually `localhost`).
-2. **Import the tables.** In the database list, click phpMyAdmin for the new database, open the Import tab, choose `sql/schema.sql` and click Import. This creates `learners`, `learner_tokens`, `resume_attempts`, `lesson_progress`, `quiz_attempts` and `completions`. Registrations, progress, quiz attempts and certificates are stored here and can be viewed in phpMyAdmin. **Updating an existing site:** import `sql/schema.sql` again. Every table uses `CREATE TABLE IF NOT EXISTS`, so this only adds the new `learner_tokens` and `resume_attempts` tables and leaves existing data alone.
+2. **Import the tables.** In the database list, click phpMyAdmin for the new database, open the Import tab, choose `sql/schema.sql` and click Import. This creates `learners`, `learner_tokens`, `resume_attempts`, `lesson_progress`, `quiz_attempts` and `completions`. Registrations, progress, quiz attempts and certificates are stored here and can be viewed in phpMyAdmin. **Updating an existing site:** import `sql/schema.sql` again, then import `sql/migrate-module-quizzes.sql`. Every table in `schema.sql` uses `CREATE TABLE IF NOT EXISTS`, so it only adds missing tables (such as `learner_tokens` and `resume_attempts`) and leaves existing data alone. The migration adds the column `quiz_attempts.quiz_key` (which module quiz an attempt belongs to) and its index, only when they are missing, so it is safe to import twice. Every existing attempt gets `quiz_key = 'kuiz-akhir'`, the old single final quiz. Nothing is deleted: a learner who already passed the old Kuiz Akhir, or already has a completion, counts as having passed all five module quizzes, keeps their certificate number and date, and `verify.php` keeps working. A learner with old lesson progress but no pass keeps their completed lessons and takes Kuiz Modul 1, 2, ... in order.
 3. **Upload the files** to `httpdocs/` with File Manager (upload a zip and extract it) or with Plesk Git. The result should be `httpdocs/public`, `httpdocs/src`, `httpdocs/config` and so on.
 4. **Set the document root.** Hosting Settings (Hosting & DNS → Hosting) → Document root: `httpdocs/public`. Save.
 5. **Configure the database connection.** Copy `config/config.example.php` to `config/config.php` and fill in the host, database name, user and password from step 1. Alternatively, leave `config/config.php` absent and set the environment variables `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` in PHP Settings. Never commit `config/config.php`.
@@ -40,7 +40,7 @@ Open the site. The landing page shows "Daftar Sekarang".
 
 ## Static preview on GitHub Pages (draft)
 
-`docs/` holds a static copy of the portal for previewing before the Plesk deployment: landing page, registration form (client-side checks only), module viewer, Kuiz Akhir and a certificate PDF generated in the browser. It is plain HTML, CSS and JavaScript with no backend. Nothing is sent to a server; progress is kept in the browser (sessionStorage, or localStorage when "Ingat saya" is ticked, as described below), and every page shows "Draf / pratonton — data tidak disimpan". The quiz answers are visible in `docs/assets/js/app.js`, so use it for preview only.
+`docs/` holds a static copy of the portal for previewing before the Plesk deployment: landing page, registration form (client-side checks only), module viewer, the module quizzes (locked in the same order as the portal) and a certificate PDF generated in the browser. It is plain HTML, CSS and JavaScript with no backend. Nothing is sent to a server; progress is kept in the browser (sessionStorage, or localStorage when "Ingat saya" is ticked, as described below), and every page shows "Draf / pratonton — data tidak disimpan". The quiz answers are visible in `docs/assets/js/app.js`, so use it for preview only.
 
 To publish it: on GitHub open the repository → Settings → Pages → Build and deployment → Source: **Deploy from a branch** → Branch: **main**, folder **/docs** → Save. After a minute the preview is at `https://raimi-akasyah.github.io/nadi/`.
 
@@ -52,29 +52,28 @@ The course structure, slide titles and quiz questions in `docs/assets/js/app.js`
 
 - **Slides and modules:** edit `content/course.php`. Each section has lessons, and each presentation lesson has `slides` of `['title' => ..., 'image' => 'assets/slides/page-NN.webp']`. The images are pages of the course deck PDF ("NADI _AWS Training Slide Deck"), rendered as 1600x900 WebP and named by PDF page number (`page-01.webp`, `page-07.webp`, ...). They live in `public/assets/slides/`, with identical copies in `docs/assets/slides/` for the static preview. The `title` is the image's alt text. A slide without `image` shows `title` and `body` as text. Keep the lesson `key` values unchanged once learners have started, because progress is stored by key.
 
-  | Section | PDF pages |
-  | --- | --- |
-  | Pengenalan | 1, 7 |
-  | Modul 1: Kesedaran AI & Keyakinan Digital | 8-10 |
-  | Modul 2: Asas AI | 11-14 |
-  | Modul 3: Kemahiran Praktikal AI | 15-23 |
-  | Modul 4: AI untuk Perniagaan Mikro & Produktiviti | 24-35 |
-  | Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan | 36-42 |
-  | Kuiz Akhir | (quiz, no slides) |
-  | Penutup | 45 |
+  | Section | PDF pages | Quiz at the end |
+  | --- | --- | --- |
+  | Pengenalan | 1, 7 | |
+  | Modul 1: Kesedaran AI & Keyakinan Digital | 8-10 | Kuiz Modul 1 (3 questions) |
+  | Modul 2: Asas AI | 11-14 | Kuiz Modul 2 (2 questions) |
+  | Modul 3: Kemahiran Praktikal AI | 15-23 | Kuiz Modul 3 (2 questions) |
+  | Modul 4: AI untuk Perniagaan Mikro & Produktiviti | 24-35 | Kuiz Modul 4 (1 question) |
+  | Modul 5: AI Bertanggungjawab & Kesediaan Masa Hadapan | 36-42 | Kuiz Modul 5 (2 questions) |
+  | Penutup | 45 | |
 
-  Pages 2-6, 43 and 44 of the deck are not used.
-- **Quiz questions:** edit `content/quiz.php`. Each question has an `id`, `text`, four `options` (`a` to `d`) and the correct `answer`. Correct answers are never sent to the browser.
-- **Pass mark:** change `pass_mark` in `content/quiz.php` (default 75). A learner passes when `correct * 100 / total >= pass_mark`.
-- **Which modules unlock the quiz:** `quiz_requires` in `content/course.php`.
+  Pages 2-6, 43 and 44 of the deck are not used. Each module's quiz is the last lesson of its section, e.g. `['key' => 'kuiz-modul-1', 'title' => 'Kuiz Modul 1', 'type' => 'quiz', 'quiz' => 'modul-1']`.
+- **Quiz questions:** edit `content/quiz.php`. `quizzes` has one list per module (`modul-1` to `modul-5`), each with a `title` and its `questions`. Each question has an `id`, `text`, four `options` (`a` to `d`) and the correct `answer`. To add a question to a module, append it to that module's list with an `id` that is unique across all quizzes (e.g. `q11`) and an `answer` of `a` to `d`, then copy it to `QUIZ` in `docs/assets/js/app.js`. Correct answers are never sent to the browser. At least 4 questions per module are recommended: with 1 to 3 questions a pass mark of 75% means every answer must be right.
+- **Pass mark:** change `pass_mark` in `content/quiz.php` (default 75, the same for every module quiz). A learner passes a quiz when `correct * 100 / total >= pass_mark`.
+- **Which modules unlock:** the order of the sections in `content/course.php`. Sections before the first quiz (Pengenalan) are always open. Modul 1 is open from the start; each later module (its slides and its quiz) opens when the quiz of the module before it is passed. A module's quiz opens when that module's slide lessons are done. Penutup, "LENGKAP & TERUSKAN" and the certificate need all five quizzes passed. The server enforces this: a locked lesson answers HTTP 403 with a message and a link to what to do first (`Course::lockReason()` in `src/Course.php`; the draft has a copy in `lockReason()` in `docs/assets/js/app.js`).
 - **Certificate:** the whole design (logos, "SIJIL PENYERTAAN", wording, signature, badge) is one picture, `public/assets/certificate/template.png`, drawn over the full A4 landscape page. The PDF covers the "[ NAMA PESERTA ]" placeholder with a white rectangle and prints the learner's name there (shrunk, or split over two lines, when it is long), and prints the date and certificate number at the bottom left. All positions are in millimetres in `content/certificate.php`. To find a position on a new template, read the pixel position in an image editor and convert it: mm = px × 297 / image width in px. To change the design, replace `template.png` and adjust those numbers. The static preview uses a copy in `docs/assets/certificate/template.png` and a copy of the numbers in `CERT` in `docs/assets/js/app.js`, so update both. The current template is 1123 × 794 px, which is 96 dpi on A4: it looks fine on screen but will be slightly soft when printed. For sharp prints, export the same design at 3508 × 2480 px (300 dpi) and replace both copies; the coordinates in mm stay the same. To check a change, run `& 'C:\xampp 8.2\php\php.exe' tests/render-cert.php <folder>` (writes `cert-php.pdf` and `cert-php-long.pdf`, no database needed) and, for the preview, `node tests/docs-check.mjs` with the environment variable `NADI_CERT_OUT=<folder>` (writes `cert-docs.png` and `cert-docs-long.png`). `certificate.issuer` in `config/config.php` is only the PDF author. The drawing code is in `src/CertificatePdf.php`.
 
 ## Continuing later: Sambung Semula
 
-Progress (lessons done, quiz pass and certificate) is stored in the database against the learner, not in the browser. To continue, the learner opens the site, goes to "Sambung Semula" (on the landing page, or the link on the registration page, `resume.php`), and enters the e-mail they registered with. No code or password is asked for.
+Progress (lessons done, module quiz passes and certificate) is stored in the database against the learner, not in the browser. To continue, the learner opens the site, goes to "Sambung Semula" (on the landing page, or the link on the registration page, `resume.php`), and enters the e-mail they registered with. No code or password is asked for.
 
 - **Same device, next day.** If "Ingat saya" was ticked, the site opens straight at their progress. If not, or after "Selesai / Keluar" or the 30-minute timeout, they enter their e-mail in "Sambung Semula" and continue where they stopped.
-- **Different device.** They enter their e-mail in "Sambung Semula" and get the same progress, quiz result and certificate. Nothing is reset.
+- **Different device.** They enter their e-mail in "Sambung Semula" and get the same progress, quiz results (which module quizzes are passed) and certificate. Nothing is reset.
 - **E-mail not found.** The page says "Tiada peserta berdaftar dengan e-mel ini" and offers registration.
 - **Registering again with the same e-mail** does not create a second learner. It resumes the existing one and says "E-mel ini sudah berdaftar, jadi kemajuan anda yang sedia ada telah disambung semula", with the name that will appear on the certificate. The details typed in the new form are not saved; the original name stays on the certificate.
 - **Several learners with one e-mail** (left from earlier testing): the one with the most progress is resumed. The order is a course completion first, then a passed quiz, then the most completed lessons, and the newest record on a tie. No rows are merged or deleted.
@@ -112,6 +111,9 @@ Each completion gets one certificate number such as `NADI-1A2B3C4D5E`, stored in
 # Create the database and import the schema
 & 'C:\xampp 8.2\mysql\bin\mysql.exe' --no-defaults -h 127.0.0.1 -u root -e "CREATE DATABASE IF NOT EXISTS nadi_lms CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; USE nadi_lms; SOURCE C:/Users/hp/Downloads/NADI/sql/schema.sql;"
 
+# An existing local database from before the module quizzes: run the migration (safe to run twice)
+Get-Content -Raw sql/migrate-module-quizzes.sql | & 'C:\xampp 8.2\mysql\bin\mysql.exe' --no-defaults -h 127.0.0.1 -u root nadi_lms
+
 # Local config: copy config/config.example.php to config/config.php
 # with host 127.0.0.1, port 3306, name nadi_lms, user root, empty password.
 
@@ -129,7 +131,7 @@ Run from the project folder:
 # Syntax check of every PHP file
 powershell -ExecutionPolicy Bypass -File tests/lint.ps1
 
-# Unit tests (no database needed): dates, course structure, quiz data, validation, grading, PDF
+# Unit tests (no database needed): dates, course structure, module locking, quiz data, validation, grading, PDF
 & 'C:\xampp 8.2\php\php.exe' tests/unit.php
 
 # End-to-end test (needs the database and the dev server running)
@@ -139,6 +141,6 @@ powershell -ExecutionPolicy Bypass -File tests/lint.ps1
 node tests/docs-check.mjs
 ```
 
-The e2e test registers new learners with unique `e2e...+<time>@example.com` e-mails, so it leaves test rows in the local database. Steps 11 to 17 cover shared computers: a learner who finishes and presses "Selesai / Keluar", a closed browser, the idle timeout and the "Ingat saya" cookie. Steps 18 to 26 cover Sambung Semula: progress made on one device (cookie jar) restored on a fresh one and finished there with a certificate in the learner's name, the not-found message, registering again with the same e-mail, duplicate e-mails, 80 minutes in one module kept alive by `keepalive.php`, "Ingat saya" on two devices, and the rate limit. The idle-timeout steps age the dev server's session file, so run the test on the same machine as the server. The test clears rate-limit rows for 127.0.0.1 before and after it runs.
+The e2e test registers new learners with unique `e2e...+<time>@example.com` e-mails, so it leaves test rows in the local database. Run `sql/migrate-module-quizzes.sql` on the local database first (see Local development). Steps 3 to 10 cover the module quizzes: Kuiz Modul 1 locked (403) before the Modul 1 lesson, Modul 2 locked before Kuiz Modul 1 is passed, no correct answers in the quiz page, a failing attempt (2/3) and a passing retry, and completion, certificate and Penutup refused until all five quizzes are passed. Steps 11 to 19 cover the certificate, verification and shared computers: a learner who finishes and presses "Selesai / Keluar", a closed browser, the idle timeout and the "Ingat saya" cookie. Steps 20 to 28 cover Sambung Semula: progress and per-module quiz status made on one device (cookie jar) restored on a fresh one and finished there with a certificate in the learner's name, the not-found message, registering again with the same e-mail, duplicate e-mails, 80 minutes in one module kept alive by `keepalive.php`, "Ingat saya" on two devices, and the rate limit. Steps 29 and 30 cover learners from before the module quizzes (a passed `kuiz-akhir` attempt, and an existing completion). Step 31 creates a scratch database `<db>_migtest` in the old format, imports `sql/migrate-module-quizzes.sql` twice, checks that the old attempt is tagged `kuiz-akhir` and the completion is unchanged, and drops it; it runs the `mysql` client from `MYSQL_BIN` (default `C:\xampp 8.2\mysql\bin\mysql.exe`) with the credentials in `config/config.php`. The idle-timeout steps age the dev server's session file, so run the test on the same machine as the server. The test clears rate-limit rows for 127.0.0.1 before and after it runs.
 
-`tests/docs-check.mjs` starts its own static server for `docs/` under `/nadi/` and a headless browser (Chrome, Edge, or `CHROME_PATH`). It fails on any console error. It covers the shared-computer flow, the idle timeout, long reading with slide clicks, the 30-day "Ingat saya" expiry, dropping data from the old draft, and the Sambung Semula note.
+`tests/docs-check.mjs` starts its own static server for `docs/` under `/nadi/` and a headless browser (Chrome, Edge, or `CHROME_PATH`). It fails on any console error. It covers the module quizzes (a failed Kuiz Modul 1, the Modul 2 lock card, a passing retry, Kuiz Modul 2 to 5 in order and the certificate refused before Kuiz Modul 5 is passed), the shared-computer flow, the idle timeout, long reading with slide clicks, the 30-day "Ingat saya" expiry, dropping data from the old draft, and the Sambung Semula note.
