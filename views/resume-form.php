@@ -2,6 +2,7 @@
 /** "Sambung Semula" form, included by the landing, registration and resume views. */
 /** @var string $resumeEmail */
 /** @var bool $resumeRemember */
+require_once __DIR__ . '/icons.php';
 $resumeEmail = $resumeEmail ?? '';
 $resumeRemember = $resumeRemember ?? false;
 ?>
@@ -17,7 +18,7 @@ $resumeRemember = $resumeRemember ?? false;
             <input id="r-remember" name="remember" type="checkbox" value="1"<?= $resumeRemember ? ' checked' : '' ?>>
             Ingat saya pada peranti ini selama 30 hari
         </label>
-        <p class="muted small field-help">Tandakan hanya pada telefon atau komputer anda sendiri.</p>
+        <p class="muted small field-help"><?= icon('shield') ?>Tandakan hanya pada telefon atau komputer anda sendiri.</p>
     </div>
-    <button type="submit" class="btn btn-primary">Sambung Semula</button>
+    <button type="submit" class="btn btn-primary btn-lg">Sambung Semula <?= icon('arrow') ?></button>
 </form>

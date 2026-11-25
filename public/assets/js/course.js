@@ -42,6 +42,7 @@
       setLink(nextBtn, n < count, n + 1);
       if (completeBtn) completeBtn.disabled = n !== count;
       viewer.setAttribute('data-current', String(n));
+      viewer.style.setProperty('--slide-progress', (n * 100 / count) + '%');
       if (window.history && window.history.replaceState) {
         window.history.replaceState(null, '', slideUrl(n));
       }
@@ -107,6 +108,38 @@
   ['click', 'keydown', 'pointerdown', 'touchstart', 'scroll', 'wheel', 'change'].forEach(function (type) {
     document.addEventListener(type, keepAlive, { passive: true, capture: true });
   });
+
+  // ---- Drawer ----
+  // Below 960px the sidebar is an off-canvas drawer (CSS, only under html.js); this opens and closes it.
+  var drawerToggle = document.getElementById('sidebar-toggle');
+  var drawer = document.getElementById('course-sidebar');
+  if (drawerToggle && drawer) {
+    var backdrop = document.querySelector('.sidebar-backdrop');
+    var drawerSearch = document.getElementById('lesson-search');
+    var isOpen = function () { return document.body.classList.contains('sidebar-open'); };
+    var setDrawer = function (open) {
+      if (open === isOpen()) return;
+      document.body.classList.toggle('sidebar-open', open);
+      drawerToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open) {
+        if (drawerSearch) drawerSearch.focus();
+      } else {
+        drawerToggle.focus();
+      }
+    };
+    drawerToggle.addEventListener('click', function () { setDrawer(!isOpen()); });
+    if (backdrop) backdrop.addEventListener('click', function () { setDrawer(false); });
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Escape' && isOpen()) setDrawer(false);
+    });
+    drawer.addEventListener('click', function (ev) {
+      var link = ev.target && ev.target.closest ? ev.target.closest('.lesson-row a') : null;
+      if (link && isOpen()) {
+        document.body.classList.remove('sidebar-open');
+        drawerToggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
 
   // ---- Sidebar search ----
   var search = document.getElementById('lesson-search');
