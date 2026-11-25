@@ -9,6 +9,17 @@
     <link rel="preload" href="assets/fonts/nunito-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="assets/fonts/fredoka-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="assets/css/app.css">
+    <style>
+        /* Draft-only layout: app.css is a byte copy of the portal's, where main is a direct child of body.
+           Here the pages render inside #app, so #app takes over the footer-at-bottom flex layout. */
+        #app { flex: 1 0 auto; display: flex; flex-direction: column; }
+        #app > main, #app > .course-layout { flex: 1 0 auto; }
+        /* Keep the draft notice visible above the mobile course drawer and its backdrop. */
+        @media (max-width: 959px) {
+            html.js body.sidebar-open .draft-notice { position: sticky; top: 0; z-index: 45; }
+            html.js .sidebar { padding-top: calc(var(--s-5) + 40px); }
+        }
+    </style>
 </head>
 <body>
 <div class="draft-notice" role="note">Draf / pratonton &mdash; data tidak disimpan</div>
