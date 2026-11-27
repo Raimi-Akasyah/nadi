@@ -10,16 +10,19 @@ function now_str(): string
 function learner_create(array $clean, string $tokenHash): int
 {
     $stmt = db()->prepare(
-        'INSERT INTO learners (full_name, age, email, phone, address, occupation, token_hash, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO learners (full_name, age, gender, email, occupation, state, district, nadi_code, nadi_name, token_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
         $clean['full_name'],
         (int)$clean['age'],
+        (string)($clean['gender'] ?? ''),
         $clean['email'],
-        $clean['phone'],
-        $clean['address'],
-        $clean['occupation'],
+        (string)($clean['occupation_text'] ?? $clean['occupation'] ?? ''),
+        (string)($clean['state'] ?? ''),
+        (string)($clean['district'] ?? ''),
+        (string)($clean['nadi_code'] ?? ''),
+        (string)($clean['nadi_name'] ?? ''),
         $tokenHash,
         now_str(),
     ]);
@@ -245,6 +248,143 @@ function completion_create(int $learnerId, string $courseKey, int $attemptId): a
         }
     }
     throw new RuntimeException('Could not create completion.');
+}
+
+// ---- Admin panel (src/admin.php, public/admin.php) ----
+
+/**
+ * FROM/WHERE for the admin learner list and its parameters (the first one is the course key).
+ * $status: '' (all), 'sijil' (has a certificate) or 'belum' (no certificate yet).
+ */
+function admin_learner_query(string $courseKey, string $search, string $status): array
+{
+    $sql = ' FROM learners l
+        LEFT JOIN completions c ON c.learner_id = l.id AND c.course_key = ?
+        LEFT JOIN quiz_attempts a ON a.id = c.quiz_attempt_id
+        WHERE 1 = 1';
+    $params = [$courseKey];
+    if ($search !== '') {
+        $like = '%' . addcslashes($search, '\\%_') . '%';
+        $sql .= " AND (l.full_name LIKE ? OR l.email LIKE ? OR l.nadi_name LIKE ? OR CONCAT(l.first_name, ' ', l.last_name) LIKE ?)";
+        array_push($params, $like, $like, $like, $like);
+    }
+    if ($status === 'sijil') {
+        $sql .= ' AND c.id IS NOT NULL';
+    } elseif ($status === 'belum') {
+        $sql .= ' AND c.id IS NULL';
+    }
+    return [$sql, $params];
+}
+
+function admin_learners_count(string $courseKey, string $search, string $status): int
+{
+    [$sql, $params] = admin_learner_query($courseKey, $search, $status);
+    $stmt = db()->prepare('SELECT COUNT(*)' . $sql);
+    $stmt->execute($params);
+    return (int)$stmt->fetchColumn();
+}
+
+/** Learners (newest first) with certificate_code, certificate_at and certificate_quiz (quiz key of the completion). */
+function admin_learners_find(string $courseKey, string $search, string $status, int $limit, int $offset): array
+{
+    [$sql, $params] = admin_learner_query($courseKey, $search, $status);
+    $stmt = db()->prepare(
+        'SELECT l.*, c.certificate_code, c.completed_at AS certificate_at, a.quiz_key AS certificate_quiz' . $sql
+        . ' ORDER BY l.id DESC LIMIT ' . max(1, $limit) . ' OFFSET ' . max(0, $offset)
+    );
+    $stmt->execute($params);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Completed lessons, passed quiz keys and attempt counts for some learners.
+ * @param int[] $ids
+ * @return array<int, array{lessons: string[], passed: string[], attempts: int}>
+ */
+function admin_progress_for(array $ids, string $courseKey): array
+{
+    $ids = array_values(array_unique(array_map('intval', $ids)));
+    if ($ids === []) {
+        return [];
+    }
+    $out = array_fill_keys($ids, ['lessons' => [], 'passed' => [], 'attempts' => 0]);
+    $in = implode(',', array_fill(0, count($ids), '?'));
+    $stmt = db()->prepare("SELECT learner_id, lesson_key FROM lesson_progress WHERE learner_id IN ($in)");
+    $stmt->execute($ids);
+    foreach ($stmt->fetchAll() as $r) {
+        $out[(int)$r['learner_id']]['lessons'][] = (string)$r['lesson_key'];
+    }
+    $stmt = db()->prepare(
+        "SELECT learner_id, quiz_key, MAX(passed) AS passed, COUNT(*) AS n FROM quiz_attempts
+         WHERE course_key = ? AND learner_id IN ($in) GROUP BY learner_id, quiz_key"
+    );
+    $stmt->execute(array_merge([$courseKey], $ids));
+    foreach ($stmt->fetchAll() as $r) {
+        $id = (int)$r['learner_id'];
+        $out[$id]['attempts'] += (int)$r['n'];
+        if ((int)$r['passed'] === 1) {
+            $out[$id]['passed'][] = (string)$r['quiz_key'];
+        }
+    }
+    return $out;
+}
+
+/**
+ * Totals for the admin dashboard.
+ * @param array<string, string[]> $trackLessonKeys track => lesson keys (a learner "started" a track with one done)
+ */
+function admin_counts(string $courseKey, string $since, array $trackLessonKeys): array
+{
+    $count = static function (string $sql, array $params = []): int {
+        $stmt = db()->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    };
+    $started = [];
+    foreach ($trackLessonKeys as $track => $keys) {
+        $in = implode(',', array_fill(0, count($keys), '?'));
+        $started[$track] = $keys === [] ? 0
+            : $count("SELECT COUNT(DISTINCT learner_id) FROM lesson_progress WHERE lesson_key IN ($in)", $keys);
+    }
+    $stmt = db()->prepare(
+        'SELECT a.quiz_key, COUNT(*) AS n FROM completions c LEFT JOIN quiz_attempts a ON a.id = c.quiz_attempt_id
+         WHERE c.course_key = ? GROUP BY a.quiz_key'
+    );
+    $stmt->execute([$courseKey]);
+    $certificates = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $certificates[(string)($r['quiz_key'] ?? '')] = (int)$r['n'];
+    }
+    return [
+        'learners'     => $count('SELECT COUNT(*) FROM learners'),
+        'learners_new' => $count('SELECT COUNT(*) FROM learners WHERE created_at >= ?', [$since]),
+        'started'      => $started,
+        'certificates' => $certificates,
+    ];
+}
+
+/** Per quiz key: attempts, passes, learners who tried and learners who passed. */
+function admin_quiz_counts(string $courseKey): array
+{
+    $stmt = db()->prepare(
+        'SELECT quiz_key, COUNT(*) AS attempts, SUM(passed) AS passes, COUNT(DISTINCT learner_id) AS learners,
+                COUNT(DISTINCT CASE WHEN passed = 1 THEN learner_id END) AS passed_learners
+         FROM quiz_attempts WHERE course_key = ? GROUP BY quiz_key'
+    );
+    $stmt->execute([$courseKey]);
+    $out = [];
+    foreach ($stmt->fetchAll() as $r) {
+        $out[(string)$r['quiz_key']] = array_map('intval', $r);
+    }
+    return $out;
+}
+
+/** quiz_key and answers_json of the latest attempts, for the "most often wrong" questions. */
+function admin_recent_answers(string $courseKey, int $limit): array
+{
+    $stmt = db()->prepare('SELECT quiz_key, answers_json FROM quiz_attempts WHERE course_key = ? ORDER BY id DESC LIMIT ' . max(1, $limit));
+    $stmt->execute([$courseKey]);
+    return $stmt->fetchAll();
 }
 
 /** A completion with learner names, looked up by certificate code. */

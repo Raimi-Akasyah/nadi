@@ -117,6 +117,7 @@
       root: videoRoot,
       youtube: videoRoot.getAttribute('data-youtube'),
       duration: parseInt(videoRoot.getAttribute('data-duration'), 10) || 0,
+      minWatch: parseInt(videoRoot.getAttribute('data-min-watch'), 10) || 0, // VIDEO_MIN_WATCH_SECONDS
       done: videoRoot.getAttribute('data-done') === '1',
       progress: sessionProgress(videoRoot.getAttribute('data-progress-key')),
       // Watching makes no clicks, so a long video would otherwise hit the idle timeout.
@@ -198,11 +199,13 @@
 
   /*
    * Video lesson player. The page shows a light poster button; only a click loads the YouTube IFrame API and
-   * player (privacy-enhanced youtube-nocookie.com), so the page stays light. The learner must watch to the end:
-   * skipping ahead past the furthest point watched jumps back, and "LENGKAP & TERUSKAN" is enabled only when the
-   * video ends. Speeds up to 2x are allowed (VIDEO_MAX_SPEED in src/helpers.php). The furthest point watched is
-   * kept by o.progress ({ get, set, clear }) so a reload continues from there. A video already completed can be
-   * watched freely.
+   * player (privacy-enhanced youtube-nocookie.com), so the page stays light. With o.minWatch > 0
+   * (VIDEO_MIN_WATCH_SECONDS in src/helpers.php) "LENGKAP & TERUSKAN" is enabled after that many seconds of actual
+   * playback from any part of the video; skipping is allowed but a jump does not count as watched. With 0 the
+   * learner must watch to the end: skipping ahead past the furthest point watched jumps back, and the button is
+   * enabled only when the video ends. Speeds up to 2x are allowed (VIDEO_MAX_SPEED). Progress is kept by
+   * o.progress ({ get, set, clear }) so a reload continues from there. A video already completed can be watched
+   * freely.
    * Keep in sync with videoLesson() in docs/assets/js/app.js.
    */
   function videoLesson(o) {
@@ -216,7 +219,12 @@
     var completeBtn = root.querySelector('#complete-btn');
     var done = !!o.done;
     var duration = o.duration;
+    // o.minWatch > 0: any minWatch seconds of playback are enough and skipping is allowed. 0: watch to the end.
+    var minWatch = o.minWatch > 0 ? Math.min(o.minWatch, duration > 0 ? duration : o.minWatch) : 0;
+    // Watch to the end: the furthest point watched. minWatch: the seconds actually played.
     var maxWatched = done ? 0 : o.progress.get();
+    var lastT = null;
+    var lastTickAt = 0;
     var player = null;
     var timer = null;
     var lastSaved = 0;
@@ -232,8 +240,12 @@
     function setText(msg) { if (text) text.textContent = msg; }
     function showProgress() {
       if (done) return;
-      if (bar) bar.style.width = (duration > 0 ? Math.min(100, maxWatched * 100 / duration) : 0) + '%';
-      if (Date.now() >= noteUntil) setText('Ditonton ' + fmt(maxWatched) + ' / ' + fmt(duration));
+      var goal = minWatch || duration;
+      if (bar) bar.style.width = (goal > 0 ? Math.min(100, maxWatched * 100 / goal) : 0) + '%';
+      if (Date.now() >= noteUntil) {
+        setText(minWatch ? 'Ditonton ' + Math.floor(maxWatched) + ' / ' + minWatch + ' saat'
+          : 'Ditonton ' + fmt(maxWatched) + ' / ' + fmt(duration));
+      }
     }
     function note(msg) {
       noteUntil = Date.now() + 4000;
@@ -246,10 +258,11 @@
     }
     function finish() {
       done = true;
-      stopTimer();
+      if (!minWatch) stopTimer(); // with minWatch the video may play on (and keep the session alive)
       o.progress.clear();
       if (bar) bar.style.width = '100%';
-      setText('Video selesai ditonton. Tekan LENGKAP & TERUSKAN untuk ke kuiz.');
+      setText(minWatch ? 'Anda boleh teruskan. Tekan LENGKAP & TERUSKAN untuk ke kuiz.'
+        : 'Video selesai ditonton. Tekan LENGKAP & TERUSKAN untuk ke kuiz.');
       if (completeBtn) completeBtn.disabled = false;
       root.classList.add('is-watched');
       if (o.onWatched) o.onWatched();
@@ -259,7 +272,14 @@
       var d = player.getDuration ? player.getDuration() : 0;
       if (d > 0) duration = d;
       var t = player.getCurrentTime();
-      if (!done && t > maxWatched + SKIP_TOLERANCE) {
+      if (minWatch) {
+        // Count normal playback only: a jump (seek) is more than the elapsed time allows at MAX_SPEED.
+        var now = Date.now();
+        if (lastT !== null && t > lastT && t - lastT <= (now - lastTickAt) / 1000 * MAX_SPEED + 0.5) maxWatched += t - lastT;
+        lastT = t;
+        lastTickAt = now;
+        if (!done && maxWatched >= minWatch) finish();
+      } else if (!done && t > maxWatched + SKIP_TOLERANCE) {
         player.seekTo(maxWatched, true);
         note('Video tidak boleh dilangkau ke hadapan. Sila tonton sampai habis.');
       } else if (t > maxWatched) {
@@ -275,10 +295,14 @@
     function onState(ev) {
       var YTS = window.YT && window.YT.PlayerState ? window.YT.PlayerState : { ENDED: 0, PLAYING: 1 };
       if (ev.data === YTS.PLAYING) {
+        lastT = null;
         startTimer();
       } else if (ev.data === YTS.ENDED) {
         tick();
-        if (done || maxWatched >= duration - 3) {
+        if (minWatch) {
+          lastT = null;
+          if (!done) note('Tonton sekurang-kurangnya ' + minWatch + ' saat video ini untuk teruskan.');
+        } else if (done || maxWatched >= duration - 3) {
           finish();
         } else {
           stopTimer();
@@ -313,7 +337,7 @@
           videoId: o.youtube,
           width: '100%',
           height: '100%',
-          playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, start: done ? 0 : Math.floor(maxWatched) },
+          playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, start: done || minWatch ? 0 : Math.floor(maxWatched) },
           events: {
             onReady: function () {
               root.classList.remove('is-loading');

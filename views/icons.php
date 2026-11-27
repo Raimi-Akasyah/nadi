@@ -10,6 +10,7 @@ if (!function_exists('icon')) {
             'back'     => '<path d="M19 12H5M11 6l-6 6 6 6"/>',
             'book'     => '<path d="M2 5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v15a2 2 0 0 0-2-2H2z"/><path d="M22 5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v15a2 2 0 0 1 2-2h8z"/>',
             'check'    => '<path d="M20 6 9 17l-5-5"/>',
+            'close'    => '<path d="M6 6l12 12M18 6 6 18"/>',
             'clipboard' => '<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2.5h6V4"/><path d="m9 13 2 2 4-4"/>',
             'download' => '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
             'expand'   => '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',

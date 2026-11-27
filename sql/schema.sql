@@ -10,16 +10,26 @@ CREATE TABLE IF NOT EXISTS learners (
     first_name VARCHAR(100) NOT NULL DEFAULT '',
     last_name VARCHAR(100) NOT NULL DEFAULT '',
     age TINYINT UNSIGNED NOT NULL,
+    -- gender, state, district, nadi_code and nadi_name come from the registration form (Jantina, Negeri, Daerah,
+    -- Pusat NADI). nadi_code is the centre's site code (content/nadi-centers.csv), empty when the learner chose
+    -- "Lain-lain" and typed nadi_name. phone and address are no longer asked; older learners keep theirs.
+    -- Existing databases: import sql/migrate-registration-fields.sql to add these columns.
+    gender VARCHAR(20) NOT NULL DEFAULT '',
     email VARCHAR(190) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
-    address VARCHAR(255) NOT NULL,
+    phone VARCHAR(20) NOT NULL DEFAULT '',
+    address VARCHAR(255) NOT NULL DEFAULT '',
     occupation VARCHAR(100) NOT NULL,
+    state VARCHAR(60) NOT NULL DEFAULT '',
+    district VARCHAR(100) NOT NULL DEFAULT '',
+    nadi_code VARCHAR(20) NOT NULL DEFAULT '',
+    nadi_name VARCHAR(150) NOT NULL DEFAULT '',
     token_hash CHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
     UNIQUE KEY uq_learners_token_hash (token_hash),
     KEY idx_learners_email (email),
-    KEY idx_learners_full_name (full_name(100))
+    KEY idx_learners_full_name (full_name(100)),
+    KEY idx_learners_nadi (state, district, nadi_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Extra "Ingat saya" tokens, one per device where a learner resumed by e-mail with the box ticked.

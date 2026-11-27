@@ -21,6 +21,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
                 header('Retry-After: ' . (RESUME_WINDOW_MINUTES * 60));
                 render('register', [
                     'title'       => 'Pendaftaran',
+    'scripts'  => ['assets/js/register.js'],
                     'old'         => $clean,
                     'errors'      => [],
                     'remember'    => $remember,
@@ -46,6 +47,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 render('register', [
     'title'    => 'Pendaftaran',
+    'scripts'  => ['assets/js/register.js'],
     'old'      => $old,
     'errors'   => $errors,
     'remember' => $remember,

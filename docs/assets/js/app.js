@@ -119,32 +119,42 @@
     quizzes: {
       'modul-1': { title: 'Kuiz Modul 1', questions: [
         { id: 'q1', text: 'Apakah maksud singkatan "AI"?', answer: 'b',
+          explanation: 'AI ialah singkatan bahasa Inggeris bagi teknologi yang membolehkan komputer melakukan tugas yang biasanya memerlukan kecerdasan manusia, seperti memahami bahasa dan membuat keputusan.',
           options: { a: 'Automasi Internet', b: 'Kecerdasan Buatan (Artificial Intelligence)', c: 'Aplikasi Interaktif', d: 'Analisis Imej' } },
         { id: 'q2', text: 'Antara berikut, yang manakah contoh penggunaan AI dalam kehidupan harian?', answer: 'c',
+          explanation: 'AI belajar daripada tingkah laku pengguna. Contohnya, aplikasi yang memilih kandungan untuk anda berdasarkan apa yang anda tonton sebelum ini. Alat yang hanya melakukan satu fungsi tetap tidak menggunakan AI.',
           options: { a: 'Kalkulator biasa', b: 'Lampu suluh', c: 'Cadangan video di aplikasi penstriman', d: 'Jam dinding' } },
         { id: 'q3', text: 'Apakah langkah terbaik untuk meningkatkan keyakinan digital?', answer: 'c',
+          explanation: 'Keyakinan digital dibina sedikit demi sedikit dengan mencuba sendiri alat baharu secara selamat, bukan dengan mengelak teknologi atau bergantung kepada orang lain.',
           options: { a: 'Mengelak semua teknologi baharu', b: 'Berkongsi kata laluan dengan rakan', c: 'Belajar dan mencuba alat digital secara berperingkat', d: 'Hanya bergantung kepada orang lain' } }
       ] },
       'modul-2': { title: 'Kuiz Modul 2', questions: [
         { id: 'q4', text: 'Pembelajaran mesin (machine learning) ialah...', answer: 'a',
+          explanation: 'Dalam pembelajaran mesin, komputer mengenal pasti corak daripada banyak contoh, bukan diprogram langkah demi langkah untuk setiap keadaan.',
           options: { a: 'Cabang AI di mana komputer belajar daripada data', b: 'Proses membaiki mesin rosak', c: 'Kursus menaip pantas', d: 'Perisian antivirus' } },
         { id: 'q5', text: 'Apakah yang diperlukan oleh model AI untuk belajar?', answer: 'b',
+          explanation: 'Model AI belajar dengan melihat banyak contoh. Contoh-contoh itulah yang dipanggil data. Tanpanya, model tidak dapat belajar apa-apa.',
           options: { a: 'Elektrik sahaja', b: 'Data', c: 'Kertas', d: 'Tiada apa-apa' } }
       ] },
       'modul-3': { title: 'Kuiz Modul 3', questions: [
         { id: 'q6', text: 'Apakah "prompt" dalam konteks alat AI generatif?', answer: 'a',
+          explanation: 'Prompt ialah apa yang anda taip atau sebut kepada alat AI untuk memberitahunya apa yang anda mahu.',
           options: { a: 'Arahan atau soalan yang diberikan kepada AI', b: 'Jenis virus komputer', c: 'Butang untuk menutup aplikasi', d: 'Kabel sambungan internet' } },
         { id: 'q7', text: 'Bagaimanakah cara terbaik untuk mendapatkan jawapan yang lebih tepat daripada AI?', answer: 'b',
+          explanation: 'AI hanya tahu apa yang anda beritahu. Ingat formula KOPI: arahan yang jelas bersama latar belakang yang cukup menghasilkan jawapan yang lebih tepat.',
           options: { a: 'Menulis arahan yang ringkas tetapi kabur', b: 'Memberikan arahan yang jelas dan konteks yang mencukupi', c: 'Menggunakan huruf besar sahaja', d: 'Bertanya soalan yang sama berulang kali tanpa perubahan' } }
       ] },
       'modul-4': { title: 'Kuiz Modul 4', questions: [
         { id: 'q8', text: 'Bagaimanakah AI boleh membantu perniagaan mikro?', answer: 'b',
+          explanation: 'AI membantu usahawan menjimatkan masa, contohnya menulis kapsyen, menghasilkan poster dan skrip promosi. Ia tidak menggantikan pelanggan dan tidak menjamin keuntungan.',
           options: { a: 'Menggantikan semua pelanggan', b: 'Menghasilkan kandungan pemasaran dan menjimatkan masa', c: 'Menghapuskan keperluan menyimpan rekod', d: 'Menjamin keuntungan setiap bulan' } }
       ] },
       'modul-5': { title: 'Kuiz Modul 5', questions: [
         { id: 'q9', text: 'Apakah yang perlu dilakukan sebelum berkongsi maklumat yang dihasilkan oleh AI?', answer: 'c',
+          explanation: 'AI boleh tersilap atau mereka-reka maklumat. Gunakan S.T.O.P: berhenti, semak dan sahkan sebelum berkongsi.',
           options: { a: 'Terus kongsi tanpa semakan', b: 'Padam semua sumber', c: 'Semak ketepatan maklumat tersebut', d: 'Tukar fon tulisan' } },
         { id: 'q10', text: 'Antara berikut, yang manakah amalan AI yang bertanggungjawab?', answer: 'c',
+          explanation: 'AI yang bertanggungjawab bermaksud menghormati privasi orang lain, tidak menyebarkan maklumat palsu dan tidak mempercayai output AI bulat-bulat.',
           options: { a: 'Memasukkan data peribadi orang lain tanpa izin', b: 'Menggunakan AI untuk menyebarkan berita palsu', c: 'Melindungi privasi dan menggunakan AI secara beretika', d: 'Mempercayai semua output AI sepenuhnya' } }
       ] },
       // Asks the questions of the listed module quizzes, in that order.
@@ -484,6 +494,7 @@
     back: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
     book: '<path d="M2 5a2 2 0 0 1 2-2h5a3 3 0 0 1 3 3v15a2 2 0 0 0-2-2H2z"/><path d="M22 5a2 2 0 0 0-2-2h-5a3 3 0 0 0-3 3v15a2 2 0 0 1 2-2h8z"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
+    close: '<path d="M6 6l12 12M18 6 6 18"/>',
     clipboard: '<rect x="5" y="4" width="14" height="18" rx="2"/><path d="M9 4V2.5h6V4"/><path d="m9 13 2 2 4-4"/>',
     download: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/>',
     expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>',
@@ -711,18 +722,38 @@
   }
 
   // ---- Registration ----
-  var FIELDS = [
-    ['full_name', 'Nama Penuh', 'text', 'maxlength="150" autocomplete="name" autocapitalize="words"'],
-    ['age', 'Umur', 'number', 'min="5" max="120" step="1" inputmode="numeric"'],
-    ['phone', 'Nombor Telefon', 'tel', 'maxlength="20" autocomplete="tel"'],
-    ['email', 'E-mel', 'email', 'maxlength="190" autocomplete="email"'],
-    ['address', 'Alamat', 'text', 'maxlength="255" autocomplete="street-address"'],
-    ['occupation', 'Pekerjaan', 'text', 'maxlength="100" autocomplete="organization-title"']
+  // Same choices and rules as content/registration.php and src/validation.php. The NADI centres come from
+  // assets/js/nadi-centers.js (window.NADI_CENTERS = [[code, name, district, state], ...], made by
+  // bin/update-nadi-centers.php), and assets/js/register.js (a copy of the portal's) runs Negeri -> Daerah -> Pusat NADI.
+  var GENDERS = ['Lelaki', 'Perempuan'];
+  var OCCUPATIONS = [
+    'Pelajar / Penuntut',
+    'Suri Rumah',
+    'Usahawan / Peniaga',
+    'Bekerja Sendiri / Pekerja Bebas (Freelance)',
+    'Pekerja Gig (e-hailing, p-hailing, penghantaran)',
+    'Petani / Penternak / Nelayan',
+    'Kakitangan Kerajaan',
+    'Kakitangan Swasta',
+    'Pesara',
+    'Tidak Bekerja / Mencari Pekerjaan'
   ];
-  // Fields that share a row on wider screens (pairs are adjacent above, as in views/register.php).
-  var HALF_FIELDS = { age: true, phone: true };
-  var FIELD_HELP = { full_name: 'Tulis nama penuh seperti dalam kad pengenalan. Nama ini dicetak pada sijil dan boleh digunakan untuk Sambung Semula.' };
-  var FULL_NAME_MAX = 150; // src/validation.php
+  var REG_OTHER = 'lain-lain';
+  var REG_OTHER_MAX = 150;
+  var FULL_NAME_MAX = 150;
+  var REG_FIELDS = ['full_name', 'age', 'gender', 'email', 'occupation', 'occupation_other', 'state', 'district', 'nadi', 'nadi_other'];
+  // state -> district -> [[code, name], ...], states in the file's order.
+  var NADI = (function () {
+    var tree = {};
+    var states = [];
+    (window.NADI_CENTERS || []).forEach(function (r) {
+      if (!tree[r[3]]) { tree[r[3]] = {}; states.push(r[3]); }
+      if (!tree[r[3]][r[2]]) tree[r[3]][r[2]] = [];
+      tree[r[3]][r[2]].push([r[0], r[1]]);
+    });
+    return { tree: tree, states: states };
+  })();
+  function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 
   // Navy brand panel beside the form (views/auth-brand.php). The draft cannot resume by e-mail,
   // so its second point says what it does instead.
@@ -735,12 +766,13 @@
       '<li><span class="auth-point-icon">' + icon('award') + '</span><span><strong>Sijil digital</strong> Muat turun PDF selepas lulus kesemua kuiz.</span></li>' +
       '</ul><img class="auth-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294"></div></aside>';
   }
-
-  // Same rules and messages as src/validation.php.
+  // Same rules and messages as validate_registration() in src/validation.php.
   function validateRegistration(input) {
     var c = {};
-    FIELDS.forEach(function (f) { c[f[0]] = String(input[f[0]] || '').trim(); });
+    REG_FIELDS.forEach(function (f) { c[f] = String(input[f] || '').trim(); });
     c.full_name = normalizeName(c.full_name);
+    c.occupation_other = normalizeName(c.occupation_other);
+    c.nadi_other = normalizeName(c.nadi_other);
     var err = {};
     if (c.full_name === '') err.full_name = 'Sila masukkan nama penuh.';
     else if (c.full_name.length > FULL_NAME_MAX) err.full_name = 'Nama penuh tidak boleh melebihi ' + FULL_NAME_MAX + ' aksara.';
@@ -749,29 +781,101 @@
     else if (!/^[0-9]{1,3}$/.test(c.age) || +c.age < 5 || +c.age > 120) err.age = 'Umur mestilah nombor antara 5 hingga 120.';
     if (c.email === '') err.email = 'Sila masukkan alamat e-mel.';
     else if (c.email.length > 190 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) err.email = 'Alamat e-mel tidak sah.';
-    if (c.phone === '') err.phone = 'Sila masukkan nombor telefon.';
-    else if (!/^\+?[0-9 \-]{7,20}$/.test(c.phone)) err.phone = 'Nombor telefon tidak sah (7 hingga 20 digit).';
-    if (c.address === '') err.address = 'Sila masukkan alamat.';
-    else if (c.address.length > 255) err.address = 'Alamat tidak boleh melebihi 255 aksara.';
-    if (c.occupation === '') err.occupation = 'Sila masukkan pekerjaan.';
-    else if (c.occupation.length > 100) err.occupation = 'Pekerjaan tidak boleh melebihi 100 aksara.';
+    if (GENDERS.indexOf(c.gender) === -1) err.gender = 'Sila pilih jantina.';
+    c.occupation_text = '';
+    if (c.occupation === REG_OTHER) {
+      if (c.occupation_other === '') err.occupation_other = 'Sila nyatakan pekerjaan anda.';
+      else if (c.occupation_other.length > 100) err.occupation_other = 'Pekerjaan tidak boleh melebihi 100 aksara.';
+      else c.occupation_text = c.occupation_other;
+    } else if (OCCUPATIONS.indexOf(c.occupation) !== -1) {
+      c.occupation_text = c.occupation;
+    } else {
+      err.occupation = 'Sila pilih pekerjaan.';
+    }
+    c.nadi_code = '';
+    c.nadi_name = '';
+    var districts = own(NADI.tree, c.state) ? NADI.tree[c.state] : null;
+    if (!districts) err.state = 'Sila pilih negeri.';
+    else if (!own(districts, c.district)) err.district = 'Sila pilih daerah.';
+    else if (c.nadi === REG_OTHER) {
+      if (c.nadi_other === '') err.nadi_other = 'Sila tulis nama pusat NADI anda.';
+      else if (c.nadi_other.length > REG_OTHER_MAX) err.nadi_other = 'Nama pusat NADI tidak boleh melebihi ' + REG_OTHER_MAX + ' aksara.';
+      else c.nadi_name = c.nadi_other;
+    } else {
+      var hit = districts[c.district].filter(function (x) { return x[0] === c.nadi; })[0];
+      if (hit) { c.nadi_code = hit[0]; c.nadi_name = hit[1]; }
+      else err.nadi = 'Sila pilih pusat NADI, atau pilih Lain-lain jika tiada dalam senarai.';
+    }
     return { clean: c, errors: err };
   }
 
+  // Same markup as views/register.php.
   function renderRegister(old, errors, remember) {
     old = old || {};
     errors = errors || {};
     var hasErrors = Object.keys(errors).length > 0;
-    var fields = FIELDS.map(function (f) {
-      var name = f[0];
-      return '<div class="field' + (HALF_FIELDS[name] ? ' field-half' : '') + (errors[name] ? ' has-error' : '') + '">' +
-        '<label for="f-' + name + '">' + e(f[1]) + ' <span class="req">*</span></label>' +
-        '<input id="f-' + name + '" name="' + name + '" type="' + f[2] + '" value="' + e(old[name]) + '" required ' + f[3] +
-        (FIELD_HELP[name] ? ' aria-describedby="h-' + name + '"' : '') + '>' +
-        (FIELD_HELP[name] ? '<p class="muted small field-note" id="h-' + name + '">' + e(FIELD_HELP[name]) + '</p>' : '') +
-        (errors[name] ? '<p class="field-error">' + icon('alert') + e(errors[name]) + '</p>' : '') +
-        '</div>';
+    function v(k) { return String(old[k] || ''); }
+    function err(k) { return errors[k] ? '<p class="field-error" id="e-' + k + '">' + icon('alert') + e(errors[k]) + '</p>' : ''; }
+    function aria(k, help) {
+      var ids = [help, errors[k] ? 'e-' + k : ''].filter(Boolean);
+      return (ids.length ? ' aria-describedby="' + ids.join(' ') + '"' : '') + (errors[k] ? ' aria-invalid="true"' : '');
+    }
+    function cls(k, extra) { return 'field' + (extra ? ' ' + extra : '') + (errors[k] ? ' has-error' : ''); }
+    function opt(value, text, current) {
+      return '<option value="' + e(value) + '"' + (value === current ? ' selected' : '') + '>' + e(text) + '</option>';
+    }
+    var districtGroups = NADI.states.map(function (s) {
+      return '<optgroup label="' + e(s) + '" data-state="' + e(s) + '">' +
+        Object.keys(NADI.tree[s]).map(function (d) { return opt(d, d, v('state') === s ? v('district') : null); }).join('') + '</optgroup>';
     }).join('');
+    var centerGroups = NADI.states.map(function (s) {
+      return Object.keys(NADI.tree[s]).map(function (d) {
+        return '<optgroup label="' + e(d + ', ' + s) + '" data-state="' + e(s) + '" data-district="' + e(d) + '">' +
+          NADI.tree[s][d].map(function (x) { return opt(x[0], x[1], v('nadi')); }).join('') + '</optgroup>';
+      }).join('');
+    }).join('');
+    var fields =
+      '<div class="form-grid">' +
+      '<div class="' + cls('full_name') + '"><label for="f-full_name">Nama Penuh <span class="req">*</span></label>' +
+      '<input id="f-full_name" name="full_name" type="text" value="' + e(v('full_name')) + '" required maxlength="' + FULL_NAME_MAX + '"' +
+      ' autocomplete="name" autocapitalize="words"' + aria('full_name', 'h-full_name') + '>' +
+      '<p class="muted small field-note" id="h-full_name">Tulis nama penuh seperti dalam kad pengenalan. Nama ini dicetak pada sijil dan boleh digunakan untuk Sambung Semula.</p>' +
+      err('full_name') + '</div>' +
+      '<div class="' + cls('age', 'field-age') + '"><label for="f-age">Umur <span class="req">*</span></label>' +
+      '<input id="f-age" name="age" type="number" value="' + e(v('age')) + '" required min="5" max="120" step="1" inputmode="numeric"' + aria('age') + '>' +
+      err('age') + '</div>' +
+      '<fieldset class="' + cls('gender', 'field-radios') + '"' + aria('gender') + '><legend>Jantina <span class="req">*</span></legend>' +
+      '<div class="radio-row">' + GENDERS.map(function (g, i) {
+        return '<label class="radio-pill" for="f-gender-' + i + '"><input id="f-gender-' + i + '" type="radio" name="gender" value="' + e(g) + '" required' +
+          (v('gender') === g ? ' checked' : '') + '><span>' + e(g) + '</span></label>';
+      }).join('') + '</div>' + err('gender') + '</fieldset>' +
+      '<div class="' + cls('email') + '"><label for="f-email">E-mel <span class="req">*</span></label>' +
+      '<input id="f-email" name="email" type="email" value="' + e(v('email')) + '" required maxlength="190" autocomplete="email"' + aria('email') + '>' +
+      err('email') + '</div>' +
+      '<div class="' + cls('occupation') + '"><label for="f-occupation">Pekerjaan <span class="req">*</span></label>' +
+      '<select id="f-occupation" name="occupation" required data-other="f-occupation_other-field"' + aria('occupation') + '>' +
+      '<option value="">Pilih pekerjaan</option>' + OCCUPATIONS.map(function (o) { return opt(o, o, v('occupation')); }).join('') +
+      opt(REG_OTHER, 'Lain-lain', v('occupation')) + '</select>' + err('occupation') + '</div>' +
+      '<div class="' + cls('occupation_other', 'field-other') + '" id="f-occupation_other-field" data-other-field>' +
+      '<label for="f-occupation_other">Nyatakan pekerjaan anda<span class="muted"> (jika Lain-lain)</span></label>' +
+      '<input id="f-occupation_other" name="occupation_other" type="text" value="' + e(v('occupation_other')) + '" maxlength="100"' +
+      (v('occupation') === REG_OTHER ? ' required' : '') + aria('occupation_other') + '>' + err('occupation_other') + '</div>' +
+      '<div class="' + cls('state', 'field-half') + '"><label for="f-state">Negeri <span class="req">*</span></label>' +
+      '<select id="f-state" name="state" required' + aria('state') + '><option value="">Pilih negeri</option>' +
+      NADI.states.map(function (s) { return opt(s, s, v('state')); }).join('') + '</select>' + err('state') + '</div>' +
+      '<div class="' + cls('district', 'field-half') + '"><label for="f-district">Daerah <span class="req">*</span></label>' +
+      '<select id="f-district" name="district" required' + aria('district') + '><option value="">Pilih daerah</option>' +
+      districtGroups + '</select>' + err('district') + '</div>' +
+      '<div class="' + cls('nadi') + '"><label for="f-nadi">Pusat NADI <span class="req">*</span></label>' +
+      '<select id="f-nadi" name="nadi" required data-other="f-nadi_other-field"' + aria('nadi', 'h-nadi') + '><option value="">Pilih pusat NADI</option>' +
+      centerGroups + opt(REG_OTHER, 'Lain-lain (tiada dalam senarai)', v('nadi')) + '</select>' +
+      '<p class="muted small field-note" id="h-nadi">Pusat NADI tempat anda menyertai kursus ini. Pilih negeri dan daerah dahulu.</p>' +
+      err('nadi') + '</div>' +
+      '<div class="' + cls('nadi_other', 'field-other') + '" id="f-nadi_other-field" data-other-field>' +
+      '<label for="f-nadi_other">Nama pusat NADI anda<span class="muted"> (jika Lain-lain)</span></label>' +
+      '<input id="f-nadi_other" name="nadi_other" type="text" value="' + e(v('nadi_other')) + '" maxlength="' + REG_OTHER_MAX + '"' +
+      ' placeholder="Contoh: NADI Kampung Baru"' + (v('nadi') === REG_OTHER ? ' required' : '') + aria('nadi_other') + '>' + err('nadi_other') + '</div>' +
+      '</div>';
     setPage('Pendaftaran', siteHeader() +
       '<main class="auth-shell"><div class="auth-grid">' + authBrand() +
       '<div class="card auth-card">' +
@@ -779,7 +883,7 @@
       '<p class="muted">Isi maklumat di bawah untuk mula belajar. Nama anda akan dicetak pada sijil seperti yang ditulis di sini.</p>' +
       '<div class="alert alert-info" id="resume-draft-note">' + RESUME_DRAFT_NOTE + '</div>' +
       (hasErrors ? '<div class="alert alert-error" role="alert">Sila betulkan ralat di bawah.</div>' : '') +
-      '<form class="form" id="register-form" novalidate><div class="form-grid">' + fields + '</div>' +
+      '<form class="form" id="register-form" novalidate>' + fields +
       '<div class="field field-check"><label for="f-remember">' +
       '<input id="f-remember" name="remember" type="checkbox" value="1"' + (remember ? ' checked' : '') + '> ' +
       'Ingat saya pada peranti ini selama 30 hari</label>' +
@@ -789,21 +893,24 @@
       'semestinya mengeluarkan anda. Anda juga akan dikeluarkan selepas 30 minit tanpa aktiviti.</p></div>' +
       '<button type="submit" class="btn btn-primary btn-lg btn-block">Hantar &amp; Mula Kursus ' + icon('arrow') + '</button>' +
       '</form></div></div></main>' + siteFooter());
-    document.getElementById('register-form').addEventListener('submit', function (ev) {
+    var form = document.getElementById('register-form');
+    if (window.nadiRegisterForm) window.nadiRegisterForm(form);
+    form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       var input = {};
-      FIELDS.forEach(function (f) { input[f[0]] = ev.target.elements[f[0]].value; });
-      var remember = ev.target.elements.remember.checked;
+      REG_FIELDS.forEach(function (f) { var el = form.elements[f]; input[f] = el ? el.value : ''; });
+      var remember = form.elements.remember.checked;
       var res = validateRegistration(input);
       if (Object.keys(res.errors).length > 0) {
         renderRegister(res.clean, res.errors, remember);
-        var firstBad = app.querySelector('.has-error input');
+        var firstBad = app.querySelector('.has-error input, .has-error select');
         if (firstBad) firstBad.focus();
         return;
       }
+      var c = res.clean;
       resetState();
-      res.clean.age = parseInt(res.clean.age, 10);
-      state.learner = res.clean;
+      state.learner = { full_name: c.full_name, age: parseInt(c.age, 10), gender: c.gender, email: c.email,
+        occupation: c.occupation_text, state: c.state, district: c.district, nadi_code: c.nadi_code, nadi_name: c.nadi_name };
       state.remember = remember;
       state.rememberUntil = remember ? Date.now() + REMEMBER_MS : 0;
       save();
@@ -1016,7 +1123,19 @@
   }
 
   // ---- Video lesson (Self-Learning), same markup as views/course.php ----
+  // Seconds of playback (any part of the video) before "LENGKAP & TERUSKAN"; 0 = watch to the end.
+  // VIDEO_MIN_WATCH_SECONDS in src/helpers.php.
+  var VIDEO_MIN_WATCH_SECONDS = 10;
+  function videoRule(duration) {
+    var need = VIDEO_MIN_WATCH_SECONDS > 0 ? Math.min(VIDEO_MIN_WATCH_SECONDS, duration) : 0;
+    return need
+      ? { start: 'Ditonton 0 / ' + need + ' saat', hint: 'Tonton video sekurang-kurangnya ' + need + ' saat untuk teruskan',
+          note: 'Tonton mana-mana bahagian video sekurang-kurangnya ' + need + ' saat untuk ke kuiz. Anda boleh melangkau dan menukar kelajuan sehingga 2x.' }
+      : { start: 'Ditonton 0:00 / ' + formatDuration(duration), hint: 'Tonton video sampai habis untuk teruskan',
+          note: 'Video tidak boleh dilangkau ke hadapan pada tontonan pertama. Anda boleh menukar kelajuan sehingga 2x melalui tetapan video.' };
+  }
   function videoHtml(lesson, videoDone) {
+    var rule = videoRule(lesson.duration);
     return '<div class="lesson-header">' + lessonHeading(lesson) + lessonLabelHtml(lesson) + '</div>' +
       '<div class="video-lesson" id="video-lesson" data-youtube="' + e(lesson.youtube) + '" data-duration="' + lesson.duration + '"' +
       ' data-done="' + (videoDone ? '1' : '0') + '">' +
@@ -1029,13 +1148,12 @@
       '<span class="video-facade-cta">Main video</span>' +
       '<span class="video-facade-time">' + formatDuration(lesson.duration) + '</span></button></div>' +
       '<div class="video-bar"><div class="video-watch"><p class="video-watch-text" id="video-watch-text" aria-live="polite">' +
-      (videoDone ? 'Video ini telah ditonton sampai habis.' : 'Ditonton 0:00 / ' + formatDuration(lesson.duration)) + '</p>' +
+      (videoDone ? 'Video ini telah ditonton.' : rule.start) + '</p>' +
       '<div class="progress-bar" aria-hidden="true"><span id="video-watch-bar" style="width: ' + (videoDone ? 100 : 0) + '%"></span></div></div>' +
       '<form class="complete-form" id="complete-form">' +
       '<button type="submit" class="btn btn-primary" id="complete-btn"' + (videoDone ? '' : ' disabled') + '>LENGKAP &amp; TERUSKAN</button>' +
-      '<span class="complete-hint">Tonton video sampai habis untuk teruskan</span></form></div></div>' +
-      '<p class="muted small video-note">' + icon('info') + 'Video tidak boleh dilangkau ke hadapan pada tontonan pertama. ' +
-      'Anda boleh menukar kelajuan sehingga 2x melalui tetapan video.</p>';
+      '<span class="complete-hint">' + e(rule.hint) + '</span></form></div></div>' +
+      '<p class="muted small video-note">' + icon('info') + e(rule.note) + '</p>';
   }
 
   function bindVideo(lesson, videoDone) {
@@ -1045,6 +1163,7 @@
       root: root,
       youtube: lesson.youtube,
       duration: lesson.duration,
+      minWatch: VIDEO_MIN_WATCH_SECONDS,
       done: videoDone,
       // The furthest point watched is kept in the draft state, so "Selesai / Keluar" forgets it.
       progress: {
@@ -1079,7 +1198,12 @@
     var completeBtn = root.querySelector('#complete-btn');
     var done = !!o.done;
     var duration = o.duration;
+    // o.minWatch > 0: any minWatch seconds of playback are enough and skipping is allowed. 0: watch to the end.
+    var minWatch = o.minWatch > 0 ? Math.min(o.minWatch, duration > 0 ? duration : o.minWatch) : 0;
+    // Watch to the end: the furthest point watched. minWatch: the seconds actually played.
     var maxWatched = done ? 0 : o.progress.get();
+    var lastT = null;
+    var lastTickAt = 0;
     var player = null;
     var timer = null;
     var lastSaved = 0;
@@ -1095,8 +1219,12 @@
     function setText(msg) { if (text) text.textContent = msg; }
     function showProgress() {
       if (done) return;
-      if (bar) bar.style.width = (duration > 0 ? Math.min(100, maxWatched * 100 / duration) : 0) + '%';
-      if (Date.now() >= noteUntil) setText('Ditonton ' + fmt(maxWatched) + ' / ' + fmt(duration));
+      var goal = minWatch || duration;
+      if (bar) bar.style.width = (goal > 0 ? Math.min(100, maxWatched * 100 / goal) : 0) + '%';
+      if (Date.now() >= noteUntil) {
+        setText(minWatch ? 'Ditonton ' + Math.floor(maxWatched) + ' / ' + minWatch + ' saat'
+          : 'Ditonton ' + fmt(maxWatched) + ' / ' + fmt(duration));
+      }
     }
     function note(msg) {
       noteUntil = Date.now() + 4000;
@@ -1109,10 +1237,11 @@
     }
     function finish() {
       done = true;
-      stopTimer();
+      if (!minWatch) stopTimer(); // with minWatch the video may play on (and keep the session alive)
       o.progress.clear();
       if (bar) bar.style.width = '100%';
-      setText('Video selesai ditonton. Tekan LENGKAP & TERUSKAN untuk ke kuiz.');
+      setText(minWatch ? 'Anda boleh teruskan. Tekan LENGKAP & TERUSKAN untuk ke kuiz.'
+        : 'Video selesai ditonton. Tekan LENGKAP & TERUSKAN untuk ke kuiz.');
       if (completeBtn) completeBtn.disabled = false;
       root.classList.add('is-watched');
       if (o.onWatched) o.onWatched();
@@ -1122,7 +1251,14 @@
       var d = player.getDuration ? player.getDuration() : 0;
       if (d > 0) duration = d;
       var t = player.getCurrentTime();
-      if (!done && t > maxWatched + SKIP_TOLERANCE) {
+      if (minWatch) {
+        // Count normal playback only: a jump (seek) is more than the elapsed time allows at MAX_SPEED.
+        var now = Date.now();
+        if (lastT !== null && t > lastT && t - lastT <= (now - lastTickAt) / 1000 * MAX_SPEED + 0.5) maxWatched += t - lastT;
+        lastT = t;
+        lastTickAt = now;
+        if (!done && maxWatched >= minWatch) finish();
+      } else if (!done && t > maxWatched + SKIP_TOLERANCE) {
         player.seekTo(maxWatched, true);
         note('Video tidak boleh dilangkau ke hadapan. Sila tonton sampai habis.');
       } else if (t > maxWatched) {
@@ -1138,10 +1274,14 @@
     function onState(ev) {
       var YTS = window.YT && window.YT.PlayerState ? window.YT.PlayerState : { ENDED: 0, PLAYING: 1 };
       if (ev.data === YTS.PLAYING) {
+        lastT = null;
         startTimer();
       } else if (ev.data === YTS.ENDED) {
         tick();
-        if (done || maxWatched >= duration - 3) {
+        if (minWatch) {
+          lastT = null;
+          if (!done) note('Tonton sekurang-kurangnya ' + minWatch + ' saat video ini untuk teruskan.');
+        } else if (done || maxWatched >= duration - 3) {
           finish();
         } else {
           stopTimer();
@@ -1176,7 +1316,7 @@
           videoId: o.youtube,
           width: '100%',
           height: '100%',
-          playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, start: done ? 0 : Math.floor(maxWatched) },
+          playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, start: done || minWatch ? 0 : Math.floor(maxWatched) },
           events: {
             onReady: function () {
               root.classList.remove('is-loading');
@@ -1333,7 +1473,7 @@
         html += '<p>Tahniah! Anda lulus kuiz ini.</p>' +
           (next ? '<a class="btn btn-primary btn-lg" id="next-lesson-btn" href="' + courseHref(next.key) + '">Teruskan ke ' + e(next.title) + '</a>' : '');
       }
-      return html + '</div>';
+      return html + '</div>' + reviewHtml(T, lesson, quiz, attempt);
     }
     var qs = quiz.questions.map(function (q, qi) {
       var opts = Object.keys(q.options).map(function (k) {
@@ -1348,6 +1488,37 @@
       qs + '<button type="submit" class="btn btn-primary btn-lg quiz-submit">Hantar Jawapan ' + icon('arrow') + '</button></form>';
   }
 
+  // "Semakan Jawapan" under the result, same rules as views/course.php: wrong questions are explained after every
+  // attempt; the correct option and every explanation are shown only after a pass. Attempts saved by an older draft
+  // have no answers and get no review.
+  function reviewHtml(T, lesson, quiz, attempt) {
+    if (!attempt.answers) return '';
+    var passed = attempt.passed;
+    var right = 0;
+    var items = quiz.questions.map(function (q, i) {
+      var given = Object.prototype.hasOwnProperty.call(q.options, attempt.answers[q.id]) ? attempt.answers[q.id] : null;
+      var ok = given !== null && given === q.answer;
+      if (ok) right++;
+      return '<li class="review-item ' + (ok ? 'is-right' : 'is-wrong') + '">' +
+        '<span class="review-mark" aria-hidden="true">' + icon(ok ? 'check' : 'close') + '</span><div class="review-body">' +
+        '<p class="review-q"><span class="review-num">' + (i + 1) + '.</span> ' + e(q.text) +
+        ' <span class="sr-only">' + (ok ? '(betul)' : '(salah)') + '</span></p>' +
+        '<p class="review-given"><strong>Jawapan anda:</strong> ' + (given !== null ? e(q.options[given]) : '<em>Tidak dijawab</em>') + '</p>' +
+        (!ok && passed ? '<p class="review-answer"><strong>Jawapan betul:</strong> ' + e(q.options[q.answer]) + '</p>' : '') +
+        (q.explanation && (!ok || passed) ? '<p class="review-explain">' + icon('info') + '<span>' + e(q.explanation) + '</span></p>' : '') +
+        '</div></li>';
+    }).join('');
+    var study = sectionLessons(T, lesson.sectionKey).filter(function (l) { return l.type !== 'quiz'; });
+    return '<section class="card quiz-review" id="quiz-review" aria-labelledby="review-heading">' +
+      '<h2 class="quiz-review-title" id="review-heading">Semakan Jawapan</h2>' +
+      '<p class="muted">Betul ' + right + ' daripada ' + quiz.questions.length + '. ' +
+      (passed ? 'Berikut jawapan anda bersama penjelasan bagi setiap soalan.'
+        : 'Baca penjelasan bagi soalan yang salah dan ulang kaji pelajaran, kemudian cuba lagi. Jawapan betul dipaparkan selepas anda lulus.') + '</p>' +
+      (!passed && study.length ? '<p class="review-study">' + icon('book') + 'Ulang kaji: ' +
+        study.map(function (l) { return '<a href="' + courseHref(l.key) + '">' + e(l.title) + '</a>'; }).join(', ') + '</p>' : '') +
+      '<ol class="review-list">' + items + '</ol></section>';
+  }
+
   function bindQuiz(T, lesson) {
     var form = document.getElementById('quiz-form');
     if (form) {
@@ -1356,15 +1527,17 @@
         if (currentLock(lesson)) return go(courseHref(lesson.key));
         var questions = quizOf(lesson).questions;
         var correct = 0;
+        var answers = {};
         questions.forEach(function (q) {
           var picked = form.querySelector('input[name="' + q.id + '"]:checked');
+          if (picked) answers[q.id] = picked.value;
           if (picked && picked.value === q.answer) correct++;
         });
         var total = questions.length;
         var percent = Math.round(correct * 10000 / total) / 100;
         var id = state.attempts.length + 1;
         var passedNow = percent >= QUIZ.passMark;
-        state.attempts.push({ id: id, quiz: lesson.key, correct: correct, total: total, percent: percent, passed: passedNow });
+        state.attempts.push({ id: id, quiz: lesson.key, correct: correct, total: total, percent: percent, passed: passedNow, answers: answers });
         if (passedNow) state.done[lesson.key] = true;
         save();
         go(courseHref(lesson.key) + '&attempt=' + id);

@@ -12,7 +12,9 @@
  * - 'pass_mark' is the minimum percentage to pass each module quiz (percent = correct * 100 / total).
  *   With 1 to 3 questions a pass mark of 75% means every answer must be correct, so 4 or more
  *   questions per module are recommended.
- * - The correct answers are never sent to the browser.
+ * - 'explanation' is shown after an attempt (Semakan Jawapan): for a wrong answer always, for every question once the
+ *   quiz is passed. The correct option itself is shown only after a pass.
+ * - The correct answers are never sent to the browser before an attempt.
  *
  * - 'self-learning' (the quiz of the Self-Learning track, content/self-learning.php) has no questions of its own:
  *   'from' lists the module quizzes whose questions it asks, in that order. A new module question is therefore
@@ -36,6 +38,7 @@ return [
                         'd' => 'Analisis Imej',
                     ],
                     'answer'  => 'b',
+                    'explanation' => 'AI ialah singkatan bahasa Inggeris bagi teknologi yang membolehkan komputer melakukan tugas yang biasanya memerlukan kecerdasan manusia, seperti memahami bahasa dan membuat keputusan.',
                 ],
                 [
                     'id'      => 'q2',
@@ -47,6 +50,7 @@ return [
                         'd' => 'Jam dinding',
                     ],
                     'answer'  => 'c',
+                    'explanation' => 'AI belajar daripada tingkah laku pengguna. Contohnya, aplikasi yang memilih kandungan untuk anda berdasarkan apa yang anda tonton sebelum ini. Alat yang hanya melakukan satu fungsi tetap tidak menggunakan AI.',
                 ],
                 [
                     'id'      => 'q3',
@@ -58,6 +62,7 @@ return [
                         'd' => 'Hanya bergantung kepada orang lain',
                     ],
                     'answer'  => 'c',
+                    'explanation' => 'Keyakinan digital dibina sedikit demi sedikit dengan mencuba sendiri alat baharu secara selamat, bukan dengan mengelak teknologi atau bergantung kepada orang lain.',
                 ],
             ],
         ],
@@ -74,6 +79,7 @@ return [
                         'd' => 'Perisian antivirus',
                     ],
                     'answer'  => 'a',
+                    'explanation' => 'Dalam pembelajaran mesin, komputer mengenal pasti corak daripada banyak contoh, bukan diprogram langkah demi langkah untuk setiap keadaan.',
                 ],
                 [
                     'id'      => 'q5',
@@ -85,6 +91,7 @@ return [
                         'd' => 'Tiada apa-apa',
                     ],
                     'answer'  => 'b',
+                    'explanation' => 'Model AI belajar dengan melihat banyak contoh. Contoh-contoh itulah yang dipanggil data. Tanpanya, model tidak dapat belajar apa-apa.',
                 ],
             ],
         ],
@@ -101,6 +108,7 @@ return [
                         'd' => 'Kabel sambungan internet',
                     ],
                     'answer'  => 'a',
+                    'explanation' => 'Prompt ialah apa yang anda taip atau sebut kepada alat AI untuk memberitahunya apa yang anda mahu.',
                 ],
                 [
                     'id'      => 'q7',
@@ -112,6 +120,7 @@ return [
                         'd' => 'Bertanya soalan yang sama berulang kali tanpa perubahan',
                     ],
                     'answer'  => 'b',
+                    'explanation' => 'AI hanya tahu apa yang anda beritahu. Ingat formula KOPI: arahan yang jelas bersama latar belakang yang cukup menghasilkan jawapan yang lebih tepat.',
                 ],
             ],
         ],
@@ -128,6 +137,7 @@ return [
                         'd' => 'Menjamin keuntungan setiap bulan',
                     ],
                     'answer'  => 'b',
+                    'explanation' => 'AI membantu usahawan menjimatkan masa, contohnya menulis kapsyen, menghasilkan poster dan skrip promosi. Ia tidak menggantikan pelanggan dan tidak menjamin keuntungan.',
                 ],
             ],
         ],
@@ -144,6 +154,7 @@ return [
                         'd' => 'Tukar fon tulisan',
                     ],
                     'answer'  => 'c',
+                    'explanation' => 'AI boleh tersilap atau mereka-reka maklumat. Gunakan S.T.O.P: berhenti, semak dan sahkan sebelum berkongsi.',
                 ],
                 [
                     'id'      => 'q10',
@@ -155,6 +166,7 @@ return [
                         'd' => 'Mempercayai semua output AI sepenuhnya',
                     ],
                     'answer'  => 'c',
+                    'explanation' => 'AI yang bertanggungjawab bermaksud menghormati privasi orang lain, tidak menyebarkan maklumat palsu dan tidak mempercayai output AI bulat-bulat.',
                 ],
             ],
         ],
