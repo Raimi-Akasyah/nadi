@@ -19,7 +19,7 @@ $samples = [
 ];
 foreach ($samples as $file => [$first, $last]) {
     $pdf = render_certificate_pdf([
-        'first_name' => $first, 'last_name' => $last, 'course_title' => Course::load()->title(),
+        'name' => $first . ' ' . $last, 'course_title' => Course::load()->title(),
         'date_text' => format_date_ms('2026-11-23 10:00:00'), 'code' => 'NADI-0123456789', 'issuer' => 'NADI',
     ]);
     file_put_contents($out . DIRECTORY_SEPARATOR . $file, $pdf);

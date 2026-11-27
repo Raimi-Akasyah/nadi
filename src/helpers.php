@@ -11,6 +11,10 @@ const RESUME_WINDOW_MINUTES = 15;
 const RESUME_MAX_PER_IP = 40;
 const RESUME_MAX_PER_EMAIL = 10;
 
+// Video lessons (Self-Learning): the player allows playback up to this speed, so the server accepts
+// "LENGKAP & TERUSKAN" once duration / VIDEO_MAX_SPEED seconds have passed since the lesson was first opened.
+const VIDEO_MAX_SPEED = 2;
+
 /** Escape a value for HTML output. */
 function e($value): string
 {
@@ -89,6 +93,86 @@ function format_date_ms(string $datetime): string
         return $datetime;
     }
     return date('j', $ts) . ' ' . $months[(int)date('n', $ts)] . ' ' . date('Y', $ts);
+}
+
+/**
+ * The learner's name as printed on the certificate: full_name, or first + last name for a learner row from before
+ * the "Nama Penuh" field (sql/migrate-full-name.sql fills full_name for those).
+ */
+function learner_name(array $learner): string
+{
+    $full = trim((string)($learner['full_name'] ?? ''));
+    if ($full !== '') {
+        return $full;
+    }
+    return trim(trim((string)($learner['first_name'] ?? '')) . ' ' . trim((string)($learner['last_name'] ?? '')));
+}
+
+/** Up to two initials for the avatar: first letters of the first two words ("Siti Nur Aminah" -> "SN"). */
+function name_initials(string $name): string
+{
+    $out = '';
+    foreach (array_slice(preg_split('/\s+/u', trim($name), -1, PREG_SPLIT_NO_EMPTY) ?: [], 0, 2) as $word) {
+        $out .= mb_substr($word, 0, 1);
+    }
+    return mb_strtoupper($out);
+}
+
+/** Format a length in seconds as m:ss, or h:mm:ss from one hour (e.g. 634 -> "10:34"). */
+function format_duration(int $seconds): string
+{
+    $seconds = max(0, $seconds);
+    $h = intdiv($seconds, 3600);
+    $m = intdiv($seconds % 3600, 60);
+    $s = $seconds % 60;
+    return $h > 0 ? sprintf('%d:%02d:%02d', $h, $m, $s) : sprintf('%d:%02d', $m, $s);
+}
+
+/** The learning track the learner last opened in this session (Course::TRACKS key). */
+function current_track(): string
+{
+    $track = $_SESSION['track'] ?? null;
+    return Course::isTrack($track) ? $track : Course::DEFAULT_TRACK;
+}
+
+function remember_track(string $track): void
+{
+    if (Course::isTrack($track)) {
+        $_SESSION['track'] = $track;
+    }
+}
+
+/** Record when the learner first opened a video lesson in this session (see video_watched_long_enough()). */
+function video_mark_opened(int $learnerId, string $lessonKey): void
+{
+    if (!isset($_SESSION['video_opened'][$learnerId][$lessonKey])) {
+        $_SESSION['video_opened'][$learnerId][$lessonKey] = time();
+    }
+}
+
+function video_opened_at(int $learnerId, string $lessonKey): ?int
+{
+    $t = $_SESSION['video_opened'][$learnerId][$lessonKey] ?? null;
+    return is_int($t) ? $t : null;
+}
+
+/**
+ * True when enough time has passed since a video lesson was opened for the whole video to have been watched
+ * at up to VIDEO_MAX_SPEED. A lesson never opened in this session ($openedAt null) has not been watched.
+ */
+function video_watched_long_enough(?int $openedAt, int $duration, int $now): bool
+{
+    return $openedAt !== null && $now - $openedAt >= (int)ceil($duration / VIDEO_MAX_SPEED);
+}
+
+/**
+ * Key under which course.js keeps the watched position of a video lesson in sessionStorage. It depends on the
+ * learner and the CSRF token (which "Selesai / Keluar" replaces), so the next learner on a shared computer starts
+ * from zero.
+ */
+function video_progress_key(int $learnerId, string $lessonKey): string
+{
+    return 'nadi-video-' . substr(hash('sha256', csrf_token() . '|' . $learnerId . '|' . $lessonKey), 0, 16);
 }
 
 /**

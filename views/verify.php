@@ -27,7 +27,7 @@ require_once __DIR__ . '/icons.php';
                 <div class="alert alert-success verify-result" role="status">
                     <p><strong>Sijil sah</strong></p>
                     <dl class="verify-details">
-                        <dt>Nama</dt><dd><?= e($found['first_name'] . ' ' . $found['last_name']) ?></dd>
+                        <dt>Nama</dt><dd><?= e(learner_name($found)) ?></dd>
                         <dt>Kursus</dt><dd><?= e($course->title()) ?></dd>
                         <dt>Tarikh</dt><dd><?= e(format_date_ms($found['completed_at'])) ?></dd>
                         <dt>No. Sijil</dt><dd><span class="cert-code"><?= e($found['certificate_code']) ?></span></dd>

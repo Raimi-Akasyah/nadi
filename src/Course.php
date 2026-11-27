@@ -1,11 +1,21 @@
 <?php
 declare(strict_types=1);
 
-/** Read-only view of content/course.php and content/quiz.php. */
+/**
+ * Read-only view of one learning track (content/course.php or content/self-learning.php) and content/quiz.php.
+ * Both tracks share the course key and title, so they share one completion and one certificate.
+ */
 final class Course
 {
     /** quiz_key of attempts from the old single final quiz (Kuiz Akhir, all 10 questions). */
     public const LEGACY_QUIZ_KEY = 'kuiz-akhir';
+
+    /** Track name => content file. The first one is the default (pages without a track). */
+    public const TRACKS = [
+        'e-learning'    => 'course.php',
+        'self-learning' => 'self-learning.php',
+    ];
+    public const DEFAULT_TRACK = 'e-learning';
 
     /** @var array */
     private $data;
@@ -19,13 +29,39 @@ final class Course
         $this->data = $data;
     }
 
-    public static function load(): self
+    public static function load(string $track = self::DEFAULT_TRACK): self
     {
-        static $instance = null;
-        if ($instance === null) {
-            $instance = new self(require APP_ROOT . '/content/course.php');
+        static $instances = [];
+        if (!isset(self::TRACKS[$track])) {
+            throw new InvalidArgumentException('Unknown track: ' . $track);
         }
-        return $instance;
+        if (!isset($instances[$track])) {
+            $instances[$track] = new self(require APP_ROOT . '/content/' . self::TRACKS[$track]);
+        }
+        return $instances[$track];
+    }
+
+    /** @param mixed $track */
+    public static function isTrack($track): bool
+    {
+        return is_string($track) && isset(self::TRACKS[$track]);
+    }
+
+    /** @return self[] every track, in TRACKS order */
+    public static function all(): array
+    {
+        return array_map([self::class, 'load'], array_keys(self::TRACKS));
+    }
+
+    /** The track that has a lesson with this key, or null. Lesson keys are unique across tracks. */
+    public static function forLesson(string $lessonKey): ?self
+    {
+        foreach (self::all() as $course) {
+            if ($course->lesson($lessonKey) !== null) {
+                return $course;
+            }
+        }
+        return null;
     }
 
     public function key(): string
@@ -36,6 +72,18 @@ final class Course
     public function title(): string
     {
         return (string)$this->data['title'];
+    }
+
+    /** Track name, e.g. 'e-learning'. */
+    public function track(): string
+    {
+        return (string)$this->data['track'];
+    }
+
+    /** Track title shown to learners, e.g. 'E-Learning'. */
+    public function trackTitle(): string
+    {
+        return (string)$this->data['track_title'];
     }
 
     public function sections(): array
@@ -134,8 +182,24 @@ final class Course
         return [
             'title'     => (string)$quiz['title'],
             'pass_mark' => (int)$data['pass_mark'],
-            'questions' => $quiz['questions'],
+            'questions' => $this->quizQuestions($quiz, $data['quizzes']),
         ];
+    }
+
+    /** A quiz's own questions, or (with 'from') the questions of the listed quizzes in that order. */
+    private function quizQuestions(array $quiz, array $all): array
+    {
+        if (!isset($quiz['from'])) {
+            return $quiz['questions'];
+        }
+        $questions = [];
+        foreach ($quiz['from'] as $key) {
+            if (!isset($all[$key]['questions'])) {
+                throw new RuntimeException('Quiz not found: ' . $key);
+            }
+            $questions = array_merge($questions, $all[$key]['questions']);
+        }
+        return $questions;
     }
 
     private function quizData(): array
@@ -212,7 +276,9 @@ final class Course
             $first = $this->firstUnpassedQuiz($passed);
             if ($first !== null) {
                 return [
-                    'message' => 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).',
+                    'message' => count($quizzes) === 1
+                        ? 'Penutup dibuka selepas anda lulus ' . $quizzes[0]['title'] . '.'
+                        : 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).',
                     'links'   => [$first],
                 ];
             }
@@ -247,6 +313,34 @@ final class Course
         if ($lesson['type'] === 'quiz') {
             return 'KUIZ - ' . count($this->quiz($lesson['key'])['questions']) . ' SOALAN';
         }
+        if ($lesson['type'] === 'video') {
+            return 'VIDEO - ' . format_duration((int)$lesson['duration']);
+        }
         return 'PEMBENTANGAN';
+    }
+
+    /** Icon name (views/icons.php) for a lesson type. */
+    public static function lessonIcon(array $lesson): string
+    {
+        if ($lesson['type'] === 'quiz') {
+            return 'quiz';
+        }
+        return $lesson['type'] === 'video' ? 'video' : 'slides';
+    }
+
+    /** Completed lessons of this track as a percentage (0-100). @param array $done map lesson key => true */
+    public function percentDone(array $done): int
+    {
+        $lessons = $this->lessons();
+        if ($lessons === []) {
+            return 0;
+        }
+        $count = 0;
+        foreach ($lessons as $l) {
+            if (isset($done[$l['key']])) {
+                $count++;
+            }
+        }
+        return (int)round($count * 100 / count($lessons));
     }
 }

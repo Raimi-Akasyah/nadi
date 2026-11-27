@@ -31,13 +31,14 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             }
             resume_login($existing, $remember);
             flash_set('E-mel ini sudah berdaftar, jadi kemajuan anda yang sedia ada telah disambung semula. '
-                . 'Nama pada sijil: ' . $existing['first_name'] . ' ' . $existing['last_name'] . '.');
-            redirect('course.php');
+                . 'Nama pada sijil: ' . learner_name($existing) . '.');
+            redirect('pilih.php');
         }
         $rawToken = bin2hex(random_bytes(32));
         $id = learner_create($clean, hash('sha256', $rawToken));
         login_learner($id, $rawToken, $remember);
-        redirect('course.php');
+        // New learners choose E-Learning or Self-Learning first.
+        redirect('pilih.php');
     }
     $old = $clean;
     http_response_code(422);

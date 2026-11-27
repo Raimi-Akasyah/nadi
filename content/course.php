@@ -1,6 +1,8 @@
 <?php
 /**
- * Course structure and slide content.
+ * E-Learning track: course structure and slide content.
+ * (The Self-Learning track, with a video instead of slides, is in content/self-learning.php. Both tracks share
+ * the course 'key' and 'title', so they share one completion and one certificate.)
  *
  * Each section: key, title, lessons.
  * Each lesson: key (unique, never rename once learners have progress), title,
@@ -20,9 +22,11 @@
  * of its section are done. Sections after the last quiz open when every quiz is passed.
  */
 return [
-    'key'      => 'ai-essentials',
-    'title'    => 'Malaysia AWS AI Essentials',
-    'sections' => [
+    'key'         => 'ai-essentials',
+    'title'       => 'Malaysia AWS AI Essentials',
+    'track'       => 'e-learning',
+    'track_title' => 'E-Learning',
+    'sections'    => [
         [
             'key'     => 'pengenalan',
             'title'   => 'Pengenalan',

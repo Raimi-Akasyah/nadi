@@ -4,7 +4,10 @@ require __DIR__ . '/../src/bootstrap.php';
 post_only();
 csrf_verify();
 $learner = require_learner();
-$course = Course::load();
+// "LENGKAP & TERUSKAN" after the last quiz of a track. Both tracks share one completion (same course key), so
+// finishing either one gives the certificate.
+$track = $_POST['track'] ?? null;
+$course = Course::load(Course::isTrack($track) ? $track : current_track());
 $learnerId = (int)$learner['id'];
 $first = $course->firstUnpassedQuiz(learner_passed_quizzes($course, $learnerId));
 if ($first !== null) {

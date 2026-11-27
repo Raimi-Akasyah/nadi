@@ -14,6 +14,10 @@
  *   questions per module are recommended.
  * - The correct answers are never sent to the browser.
  *
+ * - 'self-learning' (the quiz of the Self-Learning track, content/self-learning.php) has no questions of its own:
+ *   'from' lists the module quizzes whose questions it asks, in that order. A new module question is therefore
+ *   asked in both tracks.
+ *
  * Keep docs/assets/js/app.js (QUIZ) in sync with this file.
  */
 return [
@@ -153,6 +157,10 @@ return [
                     'answer'  => 'c',
                 ],
             ],
+        ],
+        'self-learning' => [
+            'title' => 'Kuiz Self-Learning',
+            'from'  => ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'],
         ],
     ],
 ];

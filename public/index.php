@@ -8,6 +8,8 @@ $learner = current_learner();
 render('landing', [
     'title'     => $course->title(),
     'course'    => $course,
+    'tracks'    => Course::all(),
     'learner'   => $learner,
     'signedOut' => $learner === null && isset($_GET['keluar']),
+    'scripts'   => ['assets/js/tabs.js'],
 ]);
