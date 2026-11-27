@@ -20,4 +20,9 @@ return [
     'certificate' => [
         'issuer' => 'NADI',
     ],
+    // Panel admin (https://your-domain/admin.php). Create the hash with: php bin/admin-password.php
+    // and paste it between single quotes. Leave it empty to turn the panel off (admin.php then answers 404).
+    'admin' => [
+        'password_hash' => '',
+    ],
 ];

@@ -11,8 +11,12 @@ const RESUME_WINDOW_MINUTES = 15;
 const RESUME_MAX_PER_IP = 40;
 const RESUME_MAX_PER_EMAIL = 10;
 
-// Video lessons (Self-Learning): the player allows playback up to this speed, so the server accepts
-// "LENGKAP & TERUSKAN" once duration / VIDEO_MAX_SPEED seconds have passed since the lesson was first opened.
+// Video lessons (Self-Learning). With VIDEO_MIN_WATCH_SECONDS > 0, that many seconds of playback from any part of
+// the video are enough for "LENGKAP & TERUSKAN" (skipping allowed); the server accepts it once that many seconds
+// have passed since the lesson was first opened. With 0 the whole video must be watched (no skipping ahead), and
+// the server waits duration / VIDEO_MAX_SPEED seconds. The player allows playback up to VIDEO_MAX_SPEED.
+// Keep VIDEO_MIN_WATCH_SECONDS in docs/assets/js/app.js in sync.
+const VIDEO_MIN_WATCH_SECONDS = 10;
 const VIDEO_MAX_SPEED = 2;
 
 /** Escape a value for HTML output. */
@@ -157,12 +161,23 @@ function video_opened_at(int $learnerId, string $lessonKey): ?int
 }
 
 /**
- * True when enough time has passed since a video lesson was opened for the whole video to have been watched
- * at up to VIDEO_MAX_SPEED. A lesson never opened in this session ($openedAt null) has not been watched.
+ * Seconds of playback a video lesson needs: VIDEO_MIN_WATCH_SECONDS (at most the video's length), or 0 when the
+ * whole video must be watched.
+ */
+function video_min_watch(int $duration): int
+{
+    return VIDEO_MIN_WATCH_SECONDS > 0 ? min(VIDEO_MIN_WATCH_SECONDS, max(1, $duration)) : 0;
+}
+
+/**
+ * True when enough time has passed since a video lesson was opened: video_min_watch() seconds, or, when the whole
+ * video must be watched, its length at VIDEO_MAX_SPEED. A lesson never opened in this session ($openedAt null) has
+ * not been watched.
  */
 function video_watched_long_enough(?int $openedAt, int $duration, int $now): bool
 {
-    return $openedAt !== null && $now - $openedAt >= (int)ceil($duration / VIDEO_MAX_SPEED);
+    $need = video_min_watch($duration) ?: (int)ceil($duration / VIDEO_MAX_SPEED);
+    return $openedAt !== null && $now - $openedAt >= $need;
 }
 
 /**

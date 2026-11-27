@@ -14,7 +14,14 @@ function load_config(): ?array
     $file = APP_ROOT . '/config/config.php';
     if (is_file($file)) {
         $cfg = require $file;
-        return is_array($cfg) ? $cfg : null;
+        if (!is_array($cfg)) {
+            return null;
+        }
+        // The admin password hash may also come from the environment (e.g. Plesk PHP Settings).
+        if (trim((string)($cfg['admin']['password_hash'] ?? '')) === '') {
+            $cfg['admin']['password_hash'] = (string)(getenv('ADMIN_PASSWORD_HASH') ?: '');
+        }
+        return $cfg;
     }
     $host = getenv('DB_HOST');
     $name = getenv('DB_NAME');
@@ -39,6 +46,9 @@ function load_config(): ?array
         ],
         'certificate' => [
             'issuer' => 'NADI',
+        ],
+        'admin' => [
+            'password_hash' => (string)(getenv('ADMIN_PASSWORD_HASH') ?: ''),
         ],
     ];
 }
@@ -85,8 +95,10 @@ if (PHP_SAPI !== 'cli' && session_status() === PHP_SESSION_NONE) {
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/registration.php';
 require_once __DIR__ . '/validation.php';
 require_once __DIR__ . '/repositories.php';
+require_once __DIR__ . '/admin.php';
 require_once __DIR__ . '/Course.php';
 require_once __DIR__ . '/Quiz.php';
 require_once __DIR__ . '/CertificatePdf.php';

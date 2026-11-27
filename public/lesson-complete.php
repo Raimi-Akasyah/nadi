@@ -20,11 +20,15 @@ $lock = $course->lockReason($lesson, $done, $passed);
 if ($lock !== null) {
     abort(403, $lock['message']);
 }
-// A video must have been watched to the end. The player in course.js enforces that; here the server checks that
-// enough time has passed since the lesson was opened. Rewatching a completed video needs no check.
+// A video must have been watched (VIDEO_MIN_WATCH_SECONDS of it, or to the end). The player in course.js enforces
+// that; here the server checks that enough time has passed since the lesson was opened. Rewatching a completed
+// video needs no check.
 if ($lesson['type'] === 'video' && !isset($done[$lesson['key']])
     && !video_watched_long_enough(video_opened_at($learnerId, $lesson['key']), (int)$lesson['duration'], time())) {
-    abort(403, 'Sila tonton video sampai habis sebelum meneruskan.');
+    $minWatch = video_min_watch((int)$lesson['duration']);
+    abort(403, $minWatch > 0
+        ? 'Sila tonton video sekurang-kurangnya ' . $minWatch . ' saat sebelum meneruskan.'
+        : 'Sila tonton video sampai habis sebelum meneruskan.');
 }
 
 progress_mark($learnerId, $lesson['key']);

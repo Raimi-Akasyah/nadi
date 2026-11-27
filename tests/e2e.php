@@ -86,14 +86,17 @@ function close_browser(): void
     curl_setopt($ch, CURLOPT_COOKIELIST, 'SESS');
 }
 
+/** Registration fields besides the name and e-mail: a real centre (Johor, Batu Pahat) from content/nadi-centers.csv. */
+const E2E_REG_FIELDS = ['age' => '30', 'gender' => 'Perempuan', 'occupation' => 'Usahawan / Peniaga',
+    'state' => 'Johor', 'district' => 'Batu Pahat', 'nadi' => 'PEDi_1045'];
+
 /** Register a learner in the test browser; returns the redirect response. */
 function register_learner(string $first, string $last, string $email, bool $remember): array
 {
     $page = http('GET', 'register.php');
     $fields = [
-        'csrf' => csrf_from($page['body']), 'full_name' => "$first $last", 'age' => '30',
-        'email' => $email, 'phone' => '+60 12-345 6789', 'address' => 'No 1, Jalan Ujian, Kuala Lumpur', 'occupation' => 'Penguji',
-    ];
+        'csrf' => csrf_from($page['body']), 'full_name' => "$first $last", 'email' => $email,
+    ] + E2E_REG_FIELDS;
     if ($remember) {
         $fields['remember'] = '1';
     }
@@ -319,9 +322,8 @@ try {
     $email = 'e2e+' . $suffix . '@example.com';
     $page = http('GET', 'register.php');
     $r = http('POST', 'register.php', [
-        'csrf' => csrf_from($page['body']), 'full_name' => "  $first   $last ", 'age' => '30',
-        'email' => $email, 'phone' => '+60 12-345 6789', 'address' => 'No 1, Jalan Ujian, Kuala Lumpur', 'occupation' => 'Penguji',
-    ]);
+        'csrf' => csrf_from($page['body']), 'full_name' => "  $first   $last ", 'email' => $email,
+    ] + E2E_REG_FIELDS);
     $stmt = db()->prepare('SELECT * FROM learners WHERE email = ? ORDER BY id DESC LIMIT 1');
     $stmt->execute([$email]);
     $learner = $stmt->fetch() ?: null;
@@ -329,6 +331,10 @@ try {
     step(2, 'registration saves the learner and redirects to pilih.php, which offers E-Learning and Self-Learning',
         $r['status'] === 302 && $r['location'] === 'pilih.php' && $learner !== null
         && $learner['full_name'] === "$first $last" && $learner['first_name'] === ''
+        && $learner['gender'] === 'Perempuan' && $learner['occupation'] === 'Usahawan / Peniaga'
+        && $learner['state'] === 'Johor' && $learner['district'] === 'Batu Pahat'
+        && $learner['nadi_code'] === 'PEDi_1045' && $learner['nadi_name'] === nadi_district_centers('Johor', 'Batu Pahat')['PEDi_1045']
+        && $learner['phone'] === '' && $learner['address'] === ''
         && $choose['status'] === 200 && strpos($choose['body'], 'Pilih cara belajar anda') !== false
         && strpos($choose['body'], 'href="course.php?track=e-learning"') !== false
         && strpos($choose['body'], 'href="course.php?track=self-learning"') !== false
@@ -380,11 +386,18 @@ try {
     $a = latest_attempt($learnerId);
     $failId = (int)($a['id'] ?? 0);
     $res = $r['location'] !== '' ? http('GET', $r['location']) : ['body' => ''];
-    step(7, 'Kuiz Modul 1 2/3 stored (quiz_key kuiz-modul-1, passed=0) and shows GAGAL + Cuba Lagi',
+    step(7, 'Kuiz Modul 1 2/3 stored (quiz_key kuiz-modul-1, passed=0), shows GAGAL + Cuba Lagi and a review (wrong question explained, correct answer hidden)',
         $a !== null && $a['quiz_key'] === 'kuiz-modul-1' && (int)$a['correct_count'] === 2 && (int)$a['passed'] === 0
         && strpos($res['body'], 'Markah anda: 2/3 (66.67%)') !== false
         && strpos($res['body'], 'GAGAL') !== false && strpos($res['body'], 'Cuba Lagi') !== false
-        && !in_array('kuiz-modul-1', progress_keys($learnerId), true),
+        && !in_array('kuiz-modul-1', progress_keys($learnerId), true)
+        // Semakan Jawapan: 2 right, q3 wrong with its explanation and a link to study, but not the correct answer.
+        && strpos($res['body'], 'Semakan Jawapan') !== false && strpos($res['body'], 'Betul 2 daripada 3.') !== false
+        && substr_count($res['body'], 'review-item is-wrong') === 1
+        && strpos($res['body'], htmlspecialchars($quizzes[1]['questions'][2]['explanation'], ENT_QUOTES)) !== false
+        && strpos($res['body'], 'Jawapan betul:') === false
+        && strpos($res['body'], htmlspecialchars($quizzes[1]['questions'][2]['options'][$quizzes[1]['questions'][2]['answer']], ENT_QUOTES)) === false
+        && strpos($res['body'], 'Ulang kaji:') !== false && strpos($res['body'], 'href="course.php?lesson=modul-1-pengenalan"') !== false,
         "location {$r['location']}");
 
     // 8. Retry passes; Modul 2 opens.
@@ -777,20 +790,21 @@ try {
     $cert = http('GET', 'certificate.php');
     $done = http('POST', 'complete.php', ['csrf' => $csrfS, 'track' => 'self-learning']);
     step(33, 'video not watched: lesson-complete 403, certificate.php and complete.php go to Kuiz Self-Learning',
-        $early['status'] === 403 && strpos($early['body'], 'Sila tonton video sampai habis') !== false
+        $early['status'] === 403 && strpos($early['body'], 'Sila tonton video sekurang-kurangnya 10 saat') !== false
+        && strpos($page['body'], 'data-min-watch="10"') !== false && strpos($page['body'], 'Ditonton 0 / 10 saat') !== false
         && !in_array('self-video', progress_keys($idS), true)
         && $cert['status'] === 302 && $cert['location'] === 'course.php?lesson=kuiz-self-learning'
         && $done['status'] === 302 && $done['location'] === 'course.php?lesson=kuiz-self-learning' && completion_count($idS) === 0,
         "early {$early['status']} cert {$cert['location']} complete {$done['location']}");
 
     // 34. After the video's length at 2x has passed, LENGKAP & TERUSKAN saves the lesson and opens the quiz.
-    $minWatch = (int)ceil((int)$video['duration'] / VIDEO_MAX_SPEED);
-    $aged = age_video('self-video', $minWatch - 30);
+    $minWatch = video_min_watch((int)$video['duration']);
+    $aged = age_video('self-video', $minWatch - 5);
     $tooSoon = http('POST', 'lesson-complete.php', ['csrf' => $csrfS, 'lesson' => 'self-video']);
     $aged = $aged && age_video('self-video', $minWatch + 5);
     $r = http('POST', 'lesson-complete.php', ['csrf' => $csrfS, 'lesson' => 'self-video']);
     $again = http('GET', 'course.php?lesson=self-video');
-    step(34, "video opened {$minWatch}s ago (its length at 2x): lesson saved, next is Kuiz Self-Learning; rewatch page has LENGKAP enabled",
+    step(34, "video opened {$minWatch}s ago (VIDEO_MIN_WATCH_SECONDS), not before: lesson saved, next is Kuiz Self-Learning; rewatch page has LENGKAP enabled",
         $aged && $tooSoon['status'] === 403 && $r['status'] === 302 && $r['location'] === 'course.php?lesson=kuiz-self-learning'
         && in_array('self-video', progress_keys($idS), true)
         && strpos($again['body'], 'data-done="1"') !== false && preg_match('/id="complete-btn"\s+disabled/', $again['body']) === 0,
@@ -804,11 +818,13 @@ try {
     $pass = quiz_post('kuiz-self-learning', answers_with($selfQuiz['questions'], 8));
     $passRes = $pass['location'] !== '' ? http('GET', $pass['location']) : ['body' => ''];
     $m2 = http('GET', 'course.php?lesson=modul-2-pengenalan');
-    step(35, "Kuiz Self-Learning has $n questions (no answers in HTML): 7/$n GAGAL, 8/$n LULUS with LENGKAP & TERUSKAN (track self-learning)",
+    step(35, "Kuiz Self-Learning has $n questions (no answers in HTML): 7/$n GAGAL (no correct answers shown), 8/$n LULUS with LENGKAP & TERUSKAN and the 2 correct answers",
         $n === 10 && $quizPage['status'] === 200 && !quiz_page_leaks($quizPage['body'], $selfQuiz['questions'])
         && strpos($failRes['body'], 'Markah anda: 7/10 (70%)') !== false && strpos($failRes['body'], 'GAGAL') !== false
         && strpos($passRes['body'], 'Markah anda: 8/10 (80%)') !== false && strpos($passRes['body'], 'action="complete.php"') !== false
         && strpos($passRes['body'], 'name="track" value="self-learning"') !== false
+        && strpos($failRes['body'], 'Jawapan betul:') === false
+        && substr_count($passRes['body'], 'Jawapan betul:') === 2 && substr_count($passRes['body'], 'review-explain') === 10
         && $m2['status'] === 403 && completion_count($idS) === 0,
         "fail {$fail['location']} pass {$pass['location']} e-learning modul-2 {$m2['status']}");
 
@@ -877,8 +893,8 @@ try {
     // 41. Registration validates the single Nama Penuh field.
     device('name-validate');
     $page = http('GET', 'register.php');
-    $bad = http('POST', 'register.php', ['csrf' => csrf_from($page['body']), 'full_name' => '   ', 'age' => '30',
-        'email' => 'e2e-v+' . $suffix . '@example.com', 'phone' => '0123456789', 'address' => 'Ujian', 'occupation' => 'Penguji']);
+    $bad = http('POST', 'register.php', ['csrf' => csrf_from($page['body']), 'full_name' => '   ',
+        'email' => 'e2e-v+' . $suffix . '@example.com'] + E2E_REG_FIELDS);
     step(41, 'registration form has one Nama Penuh field and refuses an empty name (422)',
         strpos($page['body'], 'name="full_name"') !== false && strpos($page['body'], 'name="first_name"') === false
         && $bad['status'] === 422 && strpos($bad['body'], 'Sila masukkan nama penuh.') !== false,
@@ -915,6 +931,162 @@ try {
     step(42, "sql/migrate-full-name.sql imports twice on old-format learners ($scratch): full_name filled, names kept, indexes added, new rows insert",
         $ok && $exits === [0, 0] && $row !== false && $row['full_name'] === 'Siti Aminah' && $row['last_name'] === 'Aminah'
         && count($idx) === 2 && $x === 0,
+        'exits ' . implode(',', $exits) . ' ' . trim($err));
+
+    // Panel admin. Needs the server started with an admin password hash and the same password in
+    // NADI_ADMIN_PASSWORD (php bin/admin-password.php makes the hash).
+    $adminPassword = (string)getenv('NADI_ADMIN_PASSWORD');
+    $adminIp = hash('sha256', 'admin|127.0.0.1');
+    if ($adminPassword === '') {
+        echo "SKIP steps 43-47 (panel admin): set NADI_ADMIN_PASSWORD and start the server with its hash\n";
+    } else {
+        db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$adminIp]);
+        // 43. Signed out: login form only; a wrong password is refused.
+        device('admin');
+        $login = http('GET', 'admin.php');
+        $wrong = http('POST', 'admin.php', ['csrf' => csrf_from($login['body']), 'action' => 'login', 'password' => 'salah-' . $suffix]);
+        $csv = http('GET', 'admin.php?export=csv');
+        step(43, 'admin.php signed out: login form, no learner data, wrong password 401, CSV refused',
+            $login['status'] === 200 && strpos($login['body'], 'name="password"') !== false && strpos($login['body'], $lastS) === false
+            && $wrong['status'] === 401 && strpos($wrong['body'], 'Kata laluan salah.') !== false
+            && strpos($csv['body'], 'Nama Penuh,') === false && strpos($csv['type'], 'text/csv') !== 0,
+            "login {$login['status']} wrong {$wrong['status']} csv {$csv['type']}");
+
+        // 44. Signed in: figures, quiz table, most-wrong questions and learner S with the Self-Learning certificate.
+        $ok = http('POST', 'admin.php', ['csrf' => csrf_from($wrong['body']), 'action' => 'login', 'password' => $adminPassword]);
+        $dash = http('GET', 'admin.php');
+        $found = http('GET', 'admin.php?' . http_build_query(['q' => strtolower($lastS)]));
+        $noCert = http('GET', 'admin.php?' . http_build_query(['q' => $lastS, 'status' => 'belum']));
+        $cS = completion_find($idS, $courseKey);
+        step(44, 'admin signed in: dashboard with figures, quizzes and most-wrong questions; search finds S with the Self-Learning certificate; filter "belum" hides S',
+            $ok['status'] === 302 && $ok['location'] === 'admin.php' && $dash['status'] === 200
+            && strpos($dash['body'], 'Peserta berdaftar') !== false && strpos($dash['body'], 'Prestasi Kuiz') !== false
+            && strpos($dash['body'], 'Kuiz Self-Learning') !== false && strpos($dash['body'], 'Soalan Paling Kerap Salah') !== false
+            && strpos($found['body'], 'Ujian ' . $lastS) !== false && strpos($found['body'], 'Peserta <span class="admin-count">(1)</span>') !== false
+            && $cS !== null && strpos($found['body'], $cS['certificate_code']) !== false && strpos($found['body'], '&middot; Self-Learning') !== false
+            && strpos($noCert['body'], 'Tiada peserta dijumpai.') !== false,
+            "login {$ok['status']} {$ok['location']} dash {$dash['status']}");
+
+        // 45. CSV export of the search: UTF-8 BOM, header, S's row; a formula-like name is neutralised.
+        learner_create(['full_name' => '=HYPERLINK("http://x")' . $suffix, 'age' => 30, 'email' => 'e2e-csv+' . $suffix . '@example.com',
+            'phone' => '+60123456789', 'address' => 'Ujian', 'occupation' => 'Penguji'], hash('sha256', random_bytes(32)));
+        $csvS = http('GET', 'admin.php?' . http_build_query(['q' => $lastS, 'export' => 'csv']));
+        $csvF = http('GET', 'admin.php?' . http_build_query(['q' => 'e2e-csv+' . $suffix, 'export' => 'csv']));
+        $lines = preg_split('/\r?\n/', trim(substr($csvS['body'], 3)));
+        step(45, 'CSV export: text/csv with BOM, header row, one row for S with the certificate; formula-like cells start with an apostrophe',
+            strpos($csvS['type'], 'text/csv') === 0 && strncmp($csvS['body'], "\xEF\xBB\xBF", 3) === 0
+            && strpos($lines[0] ?? '', 'ID,"Nama Penuh",Umur') === 0 && count($lines) === 2
+            && strpos($lines[1], 'Ujian ' . $lastS) !== false && $cS !== null && strpos($lines[1], $cS['certificate_code']) !== false
+            && strpos($csvF['body'], '"\'=HYPERLINK(""http://x"")' . $suffix . '"') !== false
+            && strpos($lines[0], 'Jantina') !== false && strpos($lines[0], '"Pusat NADI"') !== false && strpos($lines[0], 'Telefon') === false
+            && strpos($lines[1], 'PEDi_1045') !== false,
+            'type ' . $csvS['type'] . ' lines ' . count($lines) . ' ' . substr($lines[0] ?? '', 0, 40));
+
+        // 46. Log Keluar ends the admin session.
+        $out = http('POST', 'admin.php', ['csrf' => csrf_from($dash['body']), 'action' => 'logout']);
+        $after = http('GET', 'admin.php');
+        step(46, 'Log Keluar signs the admin out',
+            $out['status'] === 302 && strpos($after['body'], 'name="password"') !== false && strpos($after['body'], 'Prestasi Kuiz') === false);
+
+        // 47. After 10 wrong passwords from one IP, even the right one is refused for 15 minutes (429).
+        $page = $after;
+        for ($i = 0; $i < ADMIN_LOGIN_MAX_FAILURES; $i++) {
+            $page = http('POST', 'admin.php', ['csrf' => csrf_from($page['body']), 'action' => 'login', 'password' => 'salah']);
+        }
+        $locked = http('POST', 'admin.php', ['csrf' => csrf_from($page['body']), 'action' => 'login', 'password' => $adminPassword]);
+        $stillOut = http('GET', 'admin.php');
+        db()->prepare('DELETE FROM resume_attempts WHERE ip_hash = ?')->execute([$adminIp]);
+        // Learners on the same IP are not affected by the admin lock.
+        device('admin-learner');
+        $learnerResume = resume_with($emailS);
+        step(47, 'admin sign-in is rate limited (' . ADMIN_LOGIN_MAX_FAILURES . ' failures per IP, then 429 even with the right password); Sambung Semula still works',
+            $locked['status'] === 429 && strpos($locked['body'], 'Terlalu banyak cubaan log masuk') !== false
+            && strpos($stillOut['body'], 'name="password"') !== false && $learnerResume['location'] === 'pilih.php',
+            "locked {$locked['status']} resume {$learnerResume['location']}");
+    }
+
+    // Registration fields: Jantina, Pekerjaan, Negeri -> Daerah -> Pusat NADI (no phone or address).
+    // 48. The form lists every state, district and centre (works without JavaScript) and has no phone or address.
+    device('reg-fields');
+    $page = http('GET', 'register.php');
+    $tree = nadi_centers();
+    $centerCount = array_sum(array_map(static function (array $ds): int {
+        return array_sum(array_map('count', $ds));
+    }, $tree));
+    step(48, "registration form: Jantina, Pekerjaan list, " . count($tree) . " states, every centre ($centerCount) grouped by district, Lain-lain; no phone or address",
+        $page['status'] === 200 && strpos($page['body'], 'name="gender" value="Lelaki"') !== false
+        && strpos($page['body'], 'name="gender" value="Perempuan"') !== false
+        && strpos($page['body'], '<option value="Pesara">Pesara</option>') !== false
+        && substr_count($page['body'], '<optgroup label=') === count($tree) + array_sum(array_map('count', $tree))
+        && strpos($page['body'], 'value="PIK_0740">NADI Sungai Pinang</option>') !== false
+        && substr_count($page['body'], 'value="lain-lain"') === 2
+        && strpos($page['body'], 'name="phone"') === false && strpos($page['body'], 'name="address"') === false
+        && strpos($page['body'], 'assets/js/register.js') !== false && $centerCount >= 1000,
+        "status {$page['status']} centres $centerCount");
+
+    // 49. Wrong combinations are refused with a message on the field; nothing is saved.
+    $emailR = 'e2e-reg+' . $suffix . '@example.com';
+    $post = static function (array $fields) use ($emailR): array {
+        $page = http('GET', 'register.php');
+        return http('POST', 'register.php', $fields + ['csrf' => csrf_from($page['body']), 'full_name' => 'Ujian Daftar', 'email' => $emailR] + E2E_REG_FIELDS);
+    };
+    $cases = [
+        'gender'           => [['gender' => 'X'], 'Sila pilih jantina.'],
+        'occupation'       => [['occupation' => 'Angkasawan'], 'Sila pilih pekerjaan.'],
+        'occupation_other' => [['occupation' => REG_OTHER, 'occupation_other' => ' '], 'Sila nyatakan pekerjaan anda.'],
+        'state'            => [['state' => 'Narnia'], 'Sila pilih negeri.'],
+        'district'         => [['district' => 'Kuching'], 'Sila pilih daerah.'],
+        'nadi'             => [['nadi' => 'PIK_0740'], 'Sila pilih pusat NADI'],
+        'nadi_other'       => [['nadi' => REG_OTHER, 'nadi_other' => ''], 'Sila tulis nama pusat NADI anda.'],
+    ];
+    $bad = [];
+    foreach ($cases as $field => [$override, $msg]) {
+        $r = $post($override);
+        if ($r['status'] !== 422 || strpos($r['body'], $msg) === false || strpos($r['body'], 'id="e-' . $field . '"') === false) {
+            $bad[] = $field . ':' . $r['status'];
+        }
+    }
+    step(49, 'registration refuses a bad gender, occupation, state, a district of another state, a centre of another district and empty Lain-lain fields (422)',
+        $bad === [] && learner_ids_by_email($emailR) === [], implode(' ', $bad));
+
+    // 50. Lain-lain: the typed occupation and centre are saved (no centre code).
+    $r = $post(['occupation' => REG_OTHER, 'occupation_other' => '  Tukang   Jahit ', 'nadi' => REG_OTHER, 'nadi_other' => 'NADI Kampung Ujian ' . $suffix]);
+    $row = db()->prepare('SELECT * FROM learners WHERE email = ?');
+    $row->execute([$emailR]);
+    $row = $row->fetch() ?: [];
+    step(50, 'Lain-lain occupation and centre are saved as typed (spaces collapsed), with the chosen state and district and no centre code',
+        $r['status'] === 302 && $r['location'] === 'pilih.php' && ($row['occupation'] ?? '') === 'Tukang Jahit'
+        && ($row['nadi_name'] ?? '') === 'NADI Kampung Ujian ' . $suffix && ($row['nadi_code'] ?? 'x') === ''
+        && ($row['state'] ?? '') === 'Johor' && ($row['district'] ?? '') === 'Batu Pahat',
+        "status {$r['status']} " . json_encode(array_intersect_key($row, array_flip(['occupation', 'nadi_name', 'nadi_code']))));
+
+    // 51. sql/migrate-registration-fields.sql on a scratch copy without the new columns: imports twice, keeps old data.
+    $scratch = config()['db']['name'] . '_regtest';
+    [$x1] = mysql_run('', "DROP DATABASE IF EXISTS `$scratch`; CREATE DATABASE `$scratch` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;");
+    [$x2] = mysql_run($scratch, APP_ROOT . '/sql/schema.sql');
+    [$x3, , $err] = mysql_run($scratch,
+        "ALTER TABLE learners DROP INDEX idx_learners_nadi, DROP COLUMN gender, DROP COLUMN state, DROP COLUMN district,
+             DROP COLUMN nadi_code, DROP COLUMN nadi_name, MODIFY phone VARCHAR(20) NOT NULL, MODIFY address VARCHAR(255) NOT NULL;
+         INSERT INTO learners (id, full_name, age, email, phone, address, occupation, token_hash, created_at)
+             VALUES (1, 'Siti Lama', 40, 'lama@example.com', '0123456789', 'Kuching', 'Penguji', REPEAT('d', 64), '2026-01-02 03:04:05');");
+    $exits = [];
+    for ($i = 0; $i < 2; $i++) {
+        [$x, , $e] = mysql_run($scratch, APP_ROOT . '/sql/migrate-registration-fields.sql');
+        $exits[] = $x;
+        $err .= $e;
+    }
+    $c = config()['db'];
+    $pdo = new PDO(sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $c['host'], (int)($c['port'] ?? 3306), $scratch),
+        $c['user'], $c['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+    $old = $pdo->query('SELECT phone, address, gender, state, nadi_name FROM learners WHERE id = 1')->fetch();
+    $idx = $pdo->query("SHOW INDEX FROM learners WHERE Key_name = 'idx_learners_nadi'")->fetchAll();
+    $pdo->exec("INSERT INTO learners (full_name, age, gender, email, occupation, state, district, nadi_code, nadi_name, token_hash, created_at)
+        VALUES ('Baru', 30, 'Lelaki', 'baru@example.com', 'Pesara', 'Johor', 'Batu Pahat', 'PEDi_1045', 'NADI X', REPEAT('e', 64), '2026-01-02 03:04:05')");
+    $pdo = null;
+    [$x4] = mysql_run('', "DROP DATABASE IF EXISTS `$scratch`;");
+    step(51, "sql/migrate-registration-fields.sql imports twice on the old format ($scratch): columns and index added, old phone and address kept, new rows need no phone",
+        [$x1, $x2, $x3, $x4] === [0, 0, 0, 0] && $exits === [0, 0] && $old !== false && $old['phone'] === '0123456789'
+        && $old['address'] === 'Kuching' && $old['gender'] === '' && $old['nadi_name'] === '' && count($idx) === 3,
         'exits ' . implode(',', $exits) . ' ' . trim($err));
 } catch (Throwable $ex) {
     $failures++;

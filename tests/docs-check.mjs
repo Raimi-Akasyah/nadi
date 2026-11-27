@@ -96,12 +96,23 @@ const helpers = `
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const text = () => document.getElementById('app').innerText;
   async function go(h) { location.hash = h; await sleep(150); }
+  // Choose Negeri and Daerah like a user (change events), then the first centre, or Lain-lain with a typed name.
+  async function pickNadi(f, st, district, otherName) {
+    f.elements.state.value = st;
+    f.elements.state.dispatchEvent(new Event('change'));
+    f.elements.district.value = district;
+    f.elements.district.dispatchEvent(new Event('change'));
+    f.elements.nadi.value = otherName ? 'lain-lain' : f.elements.nadi.options[1].value;
+    f.elements.nadi.dispatchEvent(new Event('change'));
+    if (otherName) f.elements.nadi_other.value = otherName;
+  }
   async function register(last, remember) {
     await go('#/daftar');
     const f = document.getElementById('register-form');
-    const v = { full_name: '  Ujian   ' + last + ' ', age: '30', email: last.toLowerCase() + '@example.com',
-      phone: '+60 12-345 6789', address: 'No 1, Jalan Ujian', occupation: 'Penguji' };
+    const v = { full_name: '  Ujian   ' + last + ' ', age: '30', email: last.toLowerCase() + '@example.com', occupation: 'Pesara' };
     for (const k in v) f.elements[k].value = v[k];
+    f.querySelector('input[name="gender"][value="Perempuan"]').checked = true;
+    await pickNadi(f, 'Kelantan', 'Bachok');
     f.elements.remember.checked = remember;
     f.requestSubmit();
     await sleep(200);
@@ -156,6 +167,46 @@ try {
     && h.reg.includes('hanya berfungsi dalam portal sebenar') && !h.hasForm);
   step('registration help text relies on Selesai / Keluar and the timeout, not on closing the browser',
     h.reg.includes('Menutup pelayar sahaja tidak semestinya mengeluarkan anda') && !h.reg.includes('apabila pelayar ditutup'));
+
+  // Registration: Negeri -> Daerah -> Pusat NADI, Lain-lain fields, no phone or address.
+  const reg = await tab.evaluate(helpers + `
+    await go('#/daftar');
+    const f = document.getElementById('register-form');
+    const vals = (sel) => [...sel.options].map((o) => o.value).filter(Boolean);
+    const out = { phone: !!f.elements.phone, address: !!f.elements.address,
+      start: [f.elements.district.disabled, f.elements.nadi.disabled].join(),
+      otherHidden: document.getElementById('f-nadi_other-field').hidden && document.getElementById('f-occupation_other-field').hidden };
+    f.elements.state.value = 'Perlis';
+    f.elements.state.dispatchEvent(new Event('change'));
+    out.perlisDistricts = vals(f.elements.district).join();
+    f.elements.district.value = 'Perlis';
+    f.elements.district.dispatchEvent(new Event('change'));
+    const perlis = vals(f.elements.nadi);
+    out.perlisCentres = perlis.length - 1;
+    out.lastIsOther = perlis[perlis.length - 1] === 'lain-lain';
+    out.allPerlis = perlis.slice(0, -1).every((c) => window.NADI_CENTERS.some((r) => r[0] === c && r[3] === 'Perlis'));
+    out.expectedPerlis = window.NADI_CENTERS.filter((r) => r[3] === 'Perlis').length;
+    f.elements.nadi.value = 'lain-lain';
+    f.elements.nadi.dispatchEvent(new Event('change'));
+    out.otherShown = !document.getElementById('f-nadi_other-field').hidden && f.elements.nadi_other.required;
+    f.elements.state.value = 'Selangor';
+    f.elements.state.dispatchEvent(new Event('change'));
+    out.reset = [f.elements.district.value, f.elements.nadi.value, f.elements.nadi.disabled, document.getElementById('f-nadi_other-field').hidden].join();
+    f.elements.occupation.value = 'lain-lain';
+    f.elements.occupation.dispatchEvent(new Event('change'));
+    out.occOther = !document.getElementById('f-occupation_other-field').hidden;
+    f.requestSubmit();
+    await sleep(150);
+    out.errors = [...document.querySelectorAll('.field-error')].map((p) => p.id).join();
+    return out;
+  `);
+  step('registration: no phone or address; Daerah and Pusat NADI wait for the choice before them',
+    !reg.phone && !reg.address && reg.start === 'true,true' && reg.otherHidden, JSON.stringify(reg));
+  step('Negeri Perlis -> Daerah Perlis -> only the Perlis centres, then Lain-lain; Lain-lain shows the text field; a new Negeri resets both',
+    reg.perlisDistricts === 'Perlis' && reg.perlisCentres === reg.expectedPerlis && reg.perlisCentres > 0 && reg.lastIsOther && reg.allPerlis
+    && reg.otherShown && reg.reset === ',,true,true' && reg.occOther, JSON.stringify(reg));
+  step('submitting the empty form marks name, age, gender, e-mail, Lain-lain occupation and district',
+    reg.errors === 'e-full_name,e-age,e-gender,e-email,e-occupation_other,e-district', reg.errors);
 
   // Landing "Kandungan Kursus": E-Learning / Self-Learning tabs.
   const tabs = await tab.evaluate(helpers + `
@@ -250,6 +301,10 @@ try {
     a.quizLockedFirst && a.afterLesson1 === '#/kursus?lesson=kuiz-modul-1', JSON.stringify(a).slice(0, 300));
   step('Kuiz Modul 1 with one wrong answer: 2/3 (66.67%) GAGAL', a.failText.includes('Markah anda: 2/3 (66.67%)') && a.failText.includes('GAGAL'),
     a.failText.slice(0, 300));
+  step('failed attempt: Semakan Jawapan explains the wrong question and links the lesson, without the correct answer',
+    a.failText.includes('Semakan Jawapan') && a.failText.includes('Betul 2 daripada 3.') && /Ulang kaji:\s*Pengenalan AI/.test(a.failText)
+    && a.failText.includes('AI ialah singkatan bahasa Inggeris') && !a.failText.includes('Jawapan betul:')
+    && !a.failText.includes('Kecerdasan Buatan (Artificial Intelligence)'), a.failText.slice(-600));
   step('Modul 2 shows the lock card before Kuiz Modul 1 is passed', a.modul2Locked, JSON.stringify(a).slice(0, 300));
   step('Kuiz Modul 1 retry: LULUS, no LENGKAP & TERUSKAN yet, sidebar LULUS, Teruskan ke Asas AI',
     a.passText.includes('Markah anda: 3/3 (100%)') && a.passText.includes('Tahniah! Anda lulus kuiz ini.') && a.noFinishYet
@@ -359,22 +414,17 @@ try {
     document.getElementById('video-play').click();
     await sleep(50);
     out.player = [document.getElementById('video-play').hidden, fake.cfg.videoId, fake.cfg.host, fake.cfg.playerVars.rel].join();
+    out.startText = watchText();
     fake.cfg.events.onStateChange({ data: 1 });
-    await tick(2);
-    await tick(4);
-    await tick(9); // skip ahead
-    out.skip = [fake.seeks.join(), watchText().includes('tidak boleh dilangkau'), btn().disabled].join();
-    fake.t = 10;
-    fake.cfg.events.onStateChange({ data: 0 }); // reached the end by skipping
-    out.earlyEnd = [btn().disabled, fake.seeks.length].join();
-    fake.cfg.events.onStateChange({ data: 2 }); // pause saves the furthest point
+    for (const t of [1, 2, 3]) await tick(t); // 2 seconds played
+    await tick(300); // skip ahead: allowed, but the jump is not counted as watched
+    for (const t of [301, 302]) await tick(t); // 4 seconds played
+    out.skip = [fake.seeks.length, btn().disabled, watchText()].join('|');
+    fake.cfg.events.onStateChange({ data: 2 }); // pause saves the seconds played
     out.saved = (JSON.parse(sessionStorage.getItem('${KEY}')).videoPos || {})['self-video'];
     fake.cfg.events.onStateChange({ data: 1 });
-    await tick(6);
-    await tick(8);
-    await tick(10);
-    fake.cfg.events.onStateChange({ data: 0 });
-    out.finished = [btn().disabled, watchText().includes('Video selesai ditonton')].join();
+    for (let t = 303; t <= 310; t++) await tick(t); // 11 seconds played
+    out.finished = [btn().disabled, watchText().includes('Anda boleh teruskan')].join();
     document.getElementById('complete-form').requestSubmit();
     await sleep(150);
     out.afterVideo = location.hash;
@@ -411,14 +461,16 @@ try {
     && sl.poster && sl.active === 'Self-Learning' && sl.quizLocked, JSON.stringify(sl).slice(0, 300));
   step('registration has one Nama Penuh field; the name is stored with spaces collapsed',
     sl.storedName === 'Ujian DrafS|false', sl.storedName);
-  step('a click loads the youtube-nocookie player; skipping ahead jumps back and the end reached by skipping does not count',
-    sl.player === 'true,aqz-KE-bpKQ,https://www.youtube-nocookie.com,0' && sl.skip === '4,true,true' && sl.earlyEnd.startsWith('true,')
-    && sl.saved === 4, JSON.stringify(sl).slice(0, 400));
-  step('watched to the end: LENGKAP & TERUSKAN opens Kuiz Self-Learning and the player is stopped',
+  step('a click loads the youtube-nocookie player; skipping is allowed but a jump does not count as watched (4 of 10 seconds)',
+    sl.player === 'true,aqz-KE-bpKQ,https://www.youtube-nocookie.com,0' && sl.startText === 'Ditonton 0 / 10 saat'
+    && sl.skip === '0|true|Ditonton 4 / 10 saat' && sl.saved === 4, JSON.stringify(sl).slice(0, 400));
+  step('10 seconds played from any part: LENGKAP & TERUSKAN opens Kuiz Self-Learning and the player is stopped',
     sl.finished === 'false,true' && sl.afterVideo === '#/kursus?lesson=kuiz-self-learning' && sl.destroyed >= 1, JSON.stringify(sl).slice(0, 400));
   step('Kuiz Self-Learning: 10 questions, 7/10 GAGAL, 10/10 LULUS with LENGKAP & TERUSKAN; E-Learning modules stay locked',
     sl.questions === 10 && sl.failText.includes('Markah anda: 7/10 (70%)') && sl.failText.includes('GAGAL')
-    && sl.passText.includes('Markah anda: 10/10 (100%)') && sl.elearningLocked, JSON.stringify(sl).slice(0, 400));
+    && sl.passText.includes('Markah anda: 10/10 (100%)') && sl.elearningLocked
+    && !sl.failText.includes('Jawapan betul:') && sl.failText.includes('Betul 7 daripada 10.')
+    && sl.passText.includes('Betul 10 daripada 10.') && sl.passText.includes('S.T.O.P: berhenti, semak dan sahkan'), JSON.stringify(sl).slice(0, 400));
 
   const sl2 = await tab.evaluate(helpers + `
     const quiz = document.getElementById('finish-form');

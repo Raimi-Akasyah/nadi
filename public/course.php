@@ -50,6 +50,8 @@ $percent = $course->percentDone($done);
 $lock = $course->lockReason($lesson, $done, $passed);
 
 $quiz = null;
+$review = [];
+$reviewLessons = [];
 $attempt = null;
 $attemptNo = 0;
 $completion = null;
@@ -68,6 +70,12 @@ if ($lock !== null) {
         if ($attempt === null || $attempt['quiz_key'] !== $lesson['key']) {
             abort(404, 'Percubaan kuiz tidak dijumpai.');
         }
+        $stored = json_decode((string)$attempt['answers_json'], true);
+        $review = quiz_review($quiz, is_array($stored) ? $stored : []);
+        // On a failed attempt, the lessons of this module to study again before retrying.
+        $reviewLessons = array_values(array_filter($course->sectionLessons($lesson['section_key']), static function (array $l): bool {
+            return $l['type'] !== 'quiz';
+        }));
     }
 }
 
@@ -90,6 +98,8 @@ render('course', [
     'nextLesson' => $course->nextLesson($lesson['key']),
     'quiz'       => $quiz,
     'attempt'    => $attempt,
+    'review'     => $review,
+    'reviewLessons' => $reviewLessons,
     'attemptNo'  => $attemptNo,
     'completion' => $completion,
     'flash'      => flash_take(),

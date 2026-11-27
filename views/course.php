@@ -13,6 +13,8 @@
 /** @var array|null $nextLesson */
 /** @var array|null $quiz */
 /** @var array|null $attempt */
+/** @var array $review quiz_review() of $attempt */
+/** @var array $reviewLessons lessons to study again after a failed attempt */
 /** @var int $attemptNo */
 /** @var array|null $completion */
 /** @var string|null $flash */
@@ -211,6 +213,7 @@ $initials = name_initials(learner_name($learner));
         <?php elseif ($lesson['type'] === 'video'):
             $videoDone = isset($done[$lesson['key']]);
             $duration = (int)$lesson['duration'];
+            $minWatch = video_min_watch($duration);
         ?>
             <div class="lesson-header">
                 <div class="lesson-heading">
@@ -220,7 +223,7 @@ $initials = name_initials(learner_name($learner));
                 <span class="lesson-label"><?= icon('video') ?><?= e($course->lessonLabel($lesson)) ?></span>
             </div>
 
-            <div class="video-lesson" id="video-lesson" data-youtube="<?= e($lesson['youtube']) ?>" data-duration="<?= e($duration) ?>"
+            <div class="video-lesson" id="video-lesson" data-youtube="<?= e($lesson['youtube']) ?>" data-duration="<?= e($duration) ?>" data-min-watch="<?= e($minWatch) ?>"
                  data-done="<?= $videoDone ? '1' : '0' ?>" data-progress-key="<?= e(video_progress_key((int)$learner['id'], $lesson['key'])) ?>">
                 <div class="video-frame">
                     <div class="video-player" id="video-player"></div>
@@ -236,21 +239,24 @@ $initials = name_initials(learner_name($learner));
                 <div class="video-bar">
                     <div class="video-watch">
                         <p class="video-watch-text" id="video-watch-text" aria-live="polite"><?= $videoDone
-                            ? 'Video ini telah ditonton sampai habis.'
-                            : 'Ditonton 0:00 / ' . e(format_duration($duration)) ?></p>
+                            ? 'Video ini telah ditonton.'
+                            : ($minWatch > 0 ? 'Ditonton 0 / ' . e($minWatch) . ' saat' : 'Ditonton 0:00 / ' . e(format_duration($duration))) ?></p>
                         <div class="progress-bar" aria-hidden="true"><span id="video-watch-bar" style="width: <?= $videoDone ? '100' : '0' ?>%"></span></div>
                     </div>
                     <form method="post" action="lesson-complete.php" class="complete-form">
                         <?= csrf_field() ?>
                         <input type="hidden" name="lesson" value="<?= e($lesson['key']) ?>">
                         <button type="submit" class="btn btn-primary" id="complete-btn"<?= $videoDone ? '' : ' disabled' ?>>LENGKAP &amp; TERUSKAN</button>
-                        <span class="complete-hint">Tonton video sampai habis untuk teruskan</span>
+                        <span class="complete-hint"><?= $minWatch > 0
+                            ? 'Tonton video sekurang-kurangnya ' . e($minWatch) . ' saat untuk teruskan'
+                            : 'Tonton video sampai habis untuk teruskan' ?></span>
                     </form>
                 </div>
                 <noscript><p class="alert alert-warning video-noscript">Video ini memerlukan JavaScript. Sila hidupkan JavaScript dalam pelayar anda.</p></noscript>
             </div>
-            <p class="muted small video-note"><?= icon('info') ?>Video tidak boleh dilangkau ke hadapan pada tontonan pertama. Anda boleh
-                menukar kelajuan sehingga 2x melalui tetapan video.</p>
+            <p class="muted small video-note"><?= icon('info') ?><?= $minWatch > 0
+                ? 'Tonton mana-mana bahagian video sekurang-kurangnya ' . e($minWatch) . ' saat untuk ke kuiz. Anda boleh melangkau dan menukar kelajuan sehingga 2x.'
+                : 'Video tidak boleh dilangkau ke hadapan pada tontonan pertama. Anda boleh menukar kelajuan sehingga 2x melalui tetapan video.' ?></p>
         <?php else: ?>
             <div class="lesson-header">
                 <div class="lesson-heading">
@@ -300,6 +306,40 @@ $initials = name_initials(learner_name($learner));
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
+
+                    <?php if ($review !== []):
+                        $rightCount = count(array_filter($review, static function (array $r): bool { return $r['correct']; }));
+                    ?>
+                        <section class="card quiz-review" aria-labelledby="review-heading">
+                            <h2 class="quiz-review-title" id="review-heading">Semakan Jawapan</h2>
+                            <p class="muted">Betul <?= e($rightCount) ?> daripada <?= e(count($review)) ?>.
+                                <?= $attemptPassed
+                                    ? 'Berikut jawapan anda bersama penjelasan bagi setiap soalan.'
+                                    : 'Baca penjelasan bagi soalan yang salah dan ulang kaji pelajaran, kemudian cuba lagi. Jawapan betul dipaparkan selepas anda lulus.' ?></p>
+                            <?php if (!$attemptPassed && $reviewLessons !== []): ?>
+                                <p class="review-study"><?= icon('book') ?>Ulang kaji:
+                                    <?php foreach ($reviewLessons as $i => $rl): ?><?= $i > 0 ? ', ' : '' ?><a href="<?= e($lessonUrl($rl['key'])) ?>"><?= e($rl['title']) ?></a><?php endforeach; ?></p>
+                            <?php endif; ?>
+                            <ol class="review-list">
+                                <?php foreach ($review as $ri => $r): ?>
+                                    <li class="review-item <?= $r['correct'] ? 'is-right' : 'is-wrong' ?>">
+                                        <span class="review-mark" aria-hidden="true"><?= icon($r['correct'] ? 'check' : 'close') ?></span>
+                                        <div class="review-body">
+                                            <p class="review-q"><span class="review-num"><?= e($ri + 1) ?>.</span> <?= e($r['text']) ?>
+                                                <span class="sr-only"><?= $r['correct'] ? '(betul)' : '(salah)' ?></span></p>
+                                            <p class="review-given"><strong>Jawapan anda:</strong> <?= $r['given_text'] !== null ? e($r['given_text']) : '<em>Tidak dijawab</em>' ?></p>
+                                            <?php if (!$r['correct'] && $attemptPassed): ?>
+                                                <p class="review-answer"><strong>Jawapan betul:</strong> <?= e($r['answer_text']) ?></p>
+                                            <?php endif; ?>
+                                            <?php if ($r['explanation'] !== '' && (!$r['correct'] || $attemptPassed)): ?>
+                                                <p class="review-explain"><?= icon('info') ?><span><?= e($r['explanation']) ?></span></p>
+                                            <?php endif; ?>
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                            </ol>
+                        </section>
+                    <?php endif; ?>
                 <?php else: ?>
                     <form method="post" action="quiz-submit.php" class="card quiz-form">
                         <?= csrf_field() ?>

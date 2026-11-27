@@ -21,15 +21,21 @@ function validate_registration(array $in): array
         return is_string($v) ? trim($v) : '';
     };
 
+    // Form values (shown again after an error), then the values stored: occupation_text, nadi_code, nadi_name.
     $clean = [
-        'full_name'  => normalize_name($get('full_name')),
-        'age'        => $get('age'),
-        'email'      => $get('email'),
-        'phone'      => $get('phone'),
-        'address'    => $get('address'),
-        'occupation' => $get('occupation'),
+        'full_name'        => normalize_name($get('full_name')),
+        'age'              => $get('age'),
+        'gender'           => $get('gender'),
+        'email'            => $get('email'),
+        'occupation'       => $get('occupation'),
+        'occupation_other' => normalize_name($get('occupation_other')),
+        'state'            => $get('state'),
+        'district'         => $get('district'),
+        'nadi'             => $get('nadi'),
+        'nadi_other'       => normalize_name($get('nadi_other')),
     ];
     $errors = [];
+    $choices = registration_choices();
 
     if ($clean['full_name'] === '') {
         $errors['full_name'] = 'Sila masukkan nama penuh.';
@@ -53,22 +59,49 @@ function validate_registration(array $in): array
         $errors['email'] = 'Alamat e-mel tidak sah.';
     }
 
-    if ($clean['phone'] === '') {
-        $errors['phone'] = 'Sila masukkan nombor telefon.';
-    } elseif (!preg_match('/^\+?[0-9 \-]{7,20}$/', $clean['phone'])) {
-        $errors['phone'] = 'Nombor telefon tidak sah (7 hingga 20 digit).';
+    if (!in_array($clean['gender'], $choices['genders'], true)) {
+        $errors['gender'] = 'Sila pilih jantina.';
     }
 
-    if ($clean['address'] === '') {
-        $errors['address'] = 'Sila masukkan alamat.';
-    } elseif (str_len($clean['address']) > 255) {
-        $errors['address'] = 'Alamat tidak boleh melebihi 255 aksara.';
+    // Occupation: one of the list, or "Lain-lain" with the occupation typed in.
+    $clean['occupation_text'] = '';
+    if ($clean['occupation'] === REG_OTHER) {
+        if ($clean['occupation_other'] === '') {
+            $errors['occupation_other'] = 'Sila nyatakan pekerjaan anda.';
+        } elseif (str_len($clean['occupation_other']) > 100) {
+            $errors['occupation_other'] = 'Pekerjaan tidak boleh melebihi 100 aksara.';
+        } else {
+            $clean['occupation_text'] = $clean['occupation_other'];
+        }
+    } elseif (in_array($clean['occupation'], $choices['occupations'], true)) {
+        $clean['occupation_text'] = $clean['occupation'];
+    } else {
+        $errors['occupation'] = 'Sila pilih pekerjaan.';
     }
 
-    if ($clean['occupation'] === '') {
-        $errors['occupation'] = 'Sila masukkan pekerjaan.';
-    } elseif (str_len($clean['occupation']) > 100) {
-        $errors['occupation'] = 'Pekerjaan tidak boleh melebihi 100 aksara.';
+    // Pusat NADI: Negeri -> Daerah -> a centre of that district, or "Lain-lain" with the centre typed in.
+    $clean['nadi_code'] = '';
+    $clean['nadi_name'] = '';
+    if (!in_array($clean['state'], nadi_states(), true)) {
+        $errors['state'] = 'Sila pilih negeri.';
+    } elseif (!in_array($clean['district'], nadi_districts($clean['state']), true)) {
+        $errors['district'] = 'Sila pilih daerah.';
+    } elseif ($clean['nadi'] === REG_OTHER) {
+        if ($clean['nadi_other'] === '') {
+            $errors['nadi_other'] = 'Sila tulis nama pusat NADI anda.';
+        } elseif (str_len($clean['nadi_other']) > REG_OTHER_MAX) {
+            $errors['nadi_other'] = 'Nama pusat NADI tidak boleh melebihi ' . REG_OTHER_MAX . ' aksara.';
+        } else {
+            $clean['nadi_name'] = $clean['nadi_other'];
+        }
+    } else {
+        $centers = nadi_district_centers($clean['state'], $clean['district']);
+        if (isset($centers[$clean['nadi']])) {
+            $clean['nadi_code'] = $clean['nadi'];
+            $clean['nadi_name'] = $centers[$clean['nadi']];
+        } else {
+            $errors['nadi'] = 'Sila pilih pusat NADI, atau pilih Lain-lain jika tiada dalam senarai.';
+        }
     }
 
     return [$clean, $errors];

@@ -146,13 +146,21 @@ try {
 }
 check($threw, 'quiz() throws for a non-quiz lesson');
 // --- validate_registration ---
+$bachok = nadi_district_centers('Kelantan', 'Bachok');
 $valid = [
-    'full_name' => 'Ali bin Ahmad', 'age' => '30', 'email' => 'ali@example.com',
-    'phone' => '+60 12-345 6789', 'address' => 'No 1, Jalan Satu, Kuala Lumpur', 'occupation' => 'Usahawan',
+    'full_name' => 'Ali bin Ahmad', 'age' => '30', 'gender' => 'Lelaki', 'email' => 'ali@example.com',
+    'occupation' => 'Usahawan / Peniaga', 'state' => 'Kelantan', 'district' => 'Bachok', 'nadi' => (string)array_key_first($bachok),
 ];
 [$clean, $errors] = validate_registration($valid);
 check($errors === [], 'valid registration has no errors');
 check($clean['age'] === 30, 'valid registration casts age to int');
+check($clean['occupation_text'] === 'Usahawan / Peniaga' && $clean['nadi_code'] === $valid['nadi'] && $clean['nadi_name'] === $bachok[$valid['nadi']],
+    'valid registration: occupation from the list, the centre code and its name');
+[$clean, $errors] = validate_registration(array_merge($valid, ['occupation' => REG_OTHER, 'occupation_other' => ' Tukang  Jahit ',
+    'nadi' => REG_OTHER, 'nadi_other' => ' NADI   Baru ']));
+check($errors === [] && $clean['occupation_text'] === 'Tukang Jahit' && $clean['nadi_code'] === '' && $clean['nadi_name'] === 'NADI Baru',
+    'validate_registration: Lain-lain occupation and centre are taken as typed');
+check(!isset($clean['phone']) && !isset($clean['address']), 'validate_registration no longer has phone or address');
 
 $cases = [
     'missing full_name'  => [['full_name' => ''], 'full_name'],
@@ -163,16 +171,51 @@ $cases = [
     'age abc'            => [['age' => 'abc'], 'age'],
     'age 121'            => [['age' => '121'], 'age'],
     'bad email'          => [['email' => 'not-an-email'], 'email'],
-    'phone 12ab'         => [['phone' => '12ab'], 'phone'],
+    'no gender'          => [['gender' => ''], 'gender'],
+    'unknown gender'     => [['gender' => 'lelaki'], 'gender'],
     'empty occupation'   => [['occupation' => '   '], 'occupation'],
-    'empty address'      => [['address' => ''], 'address'],
+    'unknown occupation' => [['occupation' => 'Angkasawan'], 'occupation'],
+    'other occupation'   => [['occupation' => REG_OTHER], 'occupation_other'],
+    'long occupation'    => [['occupation' => REG_OTHER, 'occupation_other' => str_repeat('a', 101)], 'occupation_other'],
+    'unknown state'      => [['state' => 'Narnia'], 'state'],
+    'other state district' => [['district' => 'Kuching'], 'district'],
+    'no centre'          => [['nadi' => ''], 'nadi'],
+    'other district centre' => [['nadi' => 'PIK_0740'], 'nadi'],
+    'other centre empty' => [['nadi' => REG_OTHER, 'nadi_other' => '  '], 'nadi_other'],
+    'other centre long'  => [['nadi' => REG_OTHER, 'nadi_other' => str_repeat('a', REG_OTHER_MAX + 1)], 'nadi_other'],
 ];
 foreach ($cases as $label => [$override, $field]) {
     [, $errs] = validate_registration(array_merge($valid, $override));
     check(isset($errs[$field]) && count($errs) === 1, "validate_registration: $label -> error on $field only");
 }
 [, $errs] = validate_registration([]);
-check(count($errs) === 6, 'validate_registration: empty input -> 6 errors');
+check(array_keys($errs) === ['full_name', 'age', 'email', 'gender', 'occupation', 'state'], 'validate_registration: empty input -> errors on name, age, e-mail, gender, occupation, state');
+
+// --- Pusat NADI list (content/nadi-centers.csv) ---
+$tree = nadi_centers();
+$allCodes = [];
+$treeOk = true;
+foreach ($tree as $st => $ds) {
+    foreach ($ds as $d => $list) {
+        foreach ($list as $code => $name) {
+            $allCodes[] = (string)$code;
+            $treeOk = $treeOk && $st !== '' && $d !== '' && preg_match('/^NADI \S/', $name) === 1;
+        }
+    }
+}
+check(count($tree) === 16 && nadi_states()[0] === 'Johor' && in_array('W.P. Kuala Lumpur', nadi_states(), true), 'NADI list has the 16 states');
+check(count($allCodes) >= 1000 && count($allCodes) === count(array_unique($allCodes)) && $treeOk, 'NADI list: 1000+ centres with unique codes, each named "NADI ..." under a state and district');
+check(nadi_districts('Perlis') === ['Perlis'] && nadi_districts('Narnia') === [] && nadi_district_centers('Johor', 'Nope') === [], 'nadi_districts / nadi_district_centers');
+check(learner_nadi_label(['nadi_name' => 'NADI Bachok', 'district' => 'Bachok', 'state' => 'Kelantan']) === 'NADI Bachok, Bachok, Kelantan'
+    && learner_nadi_label([]) === '', 'learner_nadi_label()');
+$regChoices = registration_choices();
+check($regChoices['genders'] === ['Lelaki', 'Perempuan'] && count($regChoices['occupations']) >= 8
+    && !in_array(REG_OTHER_LABEL, $regChoices['occupations'], true)
+    && max(array_map('str_len', $regChoices['occupations'])) <= 100, 'registration choices: 2 genders, occupations fit learners.occupation, Lain-lain added separately');
+$docsList = (string)file_get_contents(APP_ROOT . '/docs/assets/js/nadi-centers.js');
+$docsJson = json_decode((string)preg_replace('/^.*?window\.NADI_CENTERS = (.*);\s*$/s', '$1', $docsList), true);
+check(is_array($docsJson) && array_column($docsJson, 0) === $allCodes,
+    'docs/assets/js/nadi-centers.js has the same centres, in the same order, as content/nadi-centers.csv');
 [$clean] = validate_registration(array_merge($valid, ['full_name' => "  Siti \t Nur   Aminah "]));
 check($clean['full_name'] === 'Siti Nur Aminah' && !isset($clean['first_name']), 'validate_registration collapses spaces in the full name');
 check(learner_name(['full_name' => 'Siti Aminah', 'first_name' => 'X', 'last_name' => 'Y']) === 'Siti Aminah', 'learner_name() uses full_name');
@@ -319,7 +362,58 @@ check($course->effectivePassed(['kuiz-self-learning'], false) === [], 'e-learnin
 check($self->percentDone(['self-video' => true]) === 25 && $course->percentDone([]) === 0, 'percentDone()');
 check(format_duration(634) === '10:34' && format_duration(59) === '0:59' && format_duration(3725) === '1:02:05' && format_duration(-5) === '0:00', 'format_duration()');
 check(!video_watched_long_enough(null, 634, $now = time()), 'video never opened in this session is not watched');
-check(!video_watched_long_enough($now - 316, 634, $now) && video_watched_long_enough($now - 317, 634, $now), 'video counts as watched after duration / VIDEO_MAX_SPEED seconds');
+check(VIDEO_MIN_WATCH_SECONDS === 10 && video_min_watch(634) === 10 && video_min_watch(6) === 6, 'video_min_watch: 10 seconds, at most the video length');
+check(!video_watched_long_enough($now - 9, 634, $now) && video_watched_long_enough($now - 10, 634, $now), 'video counts as watched 10 seconds after it was opened');
+
+// --- Semakan Jawapan (quiz_review) ---
+$explained = true;
+foreach ($allQuestions as $q) {
+    $explained = $explained && is_string($q['explanation'] ?? null) && trim($q['explanation']) !== '';
+}
+check($explained, 'every quiz question has an explanation');
+$quiz1 = $course->quiz('kuiz-modul-1');
+$rv = quiz_review($quiz1, ['q1' => 'b', 'q2' => 'a', 'q3' => 'zz']);
+check(count($rv) === 3 && array_column($rv, 'id') === ['q1', 'q2', 'q3'], 'quiz_review lists every question in order');
+check($rv[0]['correct'] && $rv[0]['given_text'] === $quiz1['questions'][0]['options']['b'], 'quiz_review: right answer is correct with its text');
+check(!$rv[1]['correct'] && $rv[1]['given_text'] === 'Kalkulator biasa' && $rv[1]['answer_text'] === 'Cadangan video di aplikasi penstriman', 'quiz_review: wrong answer with the given and the correct text');
+check(!$rv[2]['correct'] && $rv[2]['given_text'] === null, 'quiz_review: unknown option counts as not answered');
+check($rv[1]['explanation'] === $quiz1['questions'][1]['explanation'], 'quiz_review carries the explanation');
+
+// --- Panel admin (pure parts) ---
+check(admin_csv_cell('=HYPERLINK("x")') === "'=HYPERLINK(\"x\")" && admin_csv_cell('+60 12') === "'+60 12"
+    && admin_csv_cell('@a') === "'@a" && admin_csv_cell('-1') === "'-1" && admin_csv_cell('Siti') === 'Siti' && admin_csv_cell(5) === '5',
+    'admin_csv_cell prefixes cells a spreadsheet would run as formulas');
+check(admin_certificate_track('kuiz-self-learning')->track() === 'self-learning' && admin_certificate_track('kuiz-modul-5')->track() === 'e-learning'
+    && admin_certificate_track('kuiz-akhir')->track() === 'e-learning' && admin_certificate_track(null)->track() === 'e-learning',
+    'admin_certificate_track: self-learning quiz -> Self-Learning, others and the old Kuiz Akhir -> E-Learning');
+$qs = admin_question_stats([
+    ['quiz_key' => 'kuiz-modul-1', 'answers_json' => '{"q1":"b","q2":"a","q3":"c"}'],
+    ['quiz_key' => 'kuiz-modul-1', 'answers_json' => '{"q1":"a","q2":"a","q3":"c"}'],
+    ['quiz_key' => 'kuiz-self-learning', 'answers_json' => '{"q2":"c"}'],
+    ['quiz_key' => 'kuiz-akhir', 'answers_json' => '{"q1":"a"}'],
+    ['quiz_key' => 'kuiz-modul-1', 'answers_json' => 'not json'],
+], 20);
+$sorted = array_column($qs, 'percent');
+$desc = $sorted;
+rsort($desc);
+check($sorted === $desc && ($qs[0]['percent'] ?? 0) === 100, 'admin_question_stats sorts by % wrong');
+$byId = array_column($qs, null, 'id');
+check(($byId['q2']['asked'] ?? 0) === 3 && ($byId['q2']['wrong'] ?? 0) === 2 && ($byId['q2']['percent'] ?? 0) === 67
+    && ($byId['q1']['asked'] ?? 0) === 3 && ($byId['q1']['wrong'] ?? 0) === 2
+    && ($byId['q3']['asked'] ?? 0) === 3 && ($byId['q3']['wrong'] ?? 0) === 1,
+    'admin_question_stats counts the same question across both tracks, skips the old quiz and bad JSON, unanswered = wrong');
+check(strpos($byId['q2']['quizzes'] ?? '', 'Kuiz Modul 1') !== false && strpos($byId['q2']['quizzes'] ?? '', 'Kuiz Self-Learning') !== false,
+    'admin_question_stats names the quizzes a question appears in');
+check(count(admin_question_stats([['quiz_key' => 'kuiz-self-learning', 'answers_json' => '{}']], 3)) === 3, 'admin_question_stats returns at most $top rows');
+$savedConfig = $GLOBALS['config'];
+$GLOBALS['config']['admin'] = ['password_hash' => ''];
+$off = !admin_enabled();
+$GLOBALS['config']['admin'] = ['password_hash' => 'bukan-hash'];
+$off = $off && !admin_enabled();
+$GLOBALS['config']['admin'] = ['password_hash' => password_hash('ujian-kata-laluan', PASSWORD_DEFAULT)];
+$on = admin_enabled();
+$GLOBALS['config'] = $savedConfig;
+check($off && $on, 'admin panel is on only with a valid password hash');
 
 echo $failures === 0 ? "\nAll tests passed.\n" : "\n$failures test(s) failed.\n";
 exit($failures === 0 ? 0 : 1);
