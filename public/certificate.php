@@ -4,7 +4,8 @@ declare(strict_types=1);
 require __DIR__ . '/../src/bootstrap.php';
 
 $learner = require_learner();
-$course = Course::load();
+// Without a completion, send the learner to the next quiz of the track they last opened.
+$course = Course::load(current_track());
 $completion = completion_find((int)$learner['id'], $course->key());
 if ($completion === null) {
     $quizzes = $course->quizLessons();

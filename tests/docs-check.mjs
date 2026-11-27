@@ -99,7 +99,7 @@ const helpers = `
   async function register(last, remember) {
     await go('#/daftar');
     const f = document.getElementById('register-form');
-    const v = { first_name: 'Ujian', last_name: last, age: '30', email: last.toLowerCase() + '@example.com',
+    const v = { full_name: '  Ujian   ' + last + ' ', age: '30', email: last.toLowerCase() + '@example.com',
       phone: '+60 12-345 6789', address: 'No 1, Jalan Ujian', occupation: 'Penguji' };
     for (const k in v) f.elements[k].value = v[k];
     f.elements.remember.checked = remember;
@@ -157,10 +157,38 @@ try {
   step('registration help text relies on Selesai / Keluar and the timeout, not on closing the browser',
     h.reg.includes('Menutup pelayar sahaja tidak semestinya mengeluarkan anda') && !h.reg.includes('apabila pelayar ditutup'));
 
+  // Landing "Kandungan Kursus": E-Learning / Self-Learning tabs.
+  const tabs = await tab.evaluate(helpers + `
+    await go('#/');
+    const vis = (id) => !document.getElementById(id).hidden;
+    const out = { tabs: [...document.querySelectorAll('[role="tab"]')].map((t) => t.textContent.trim().replace(/\\s+/g, ' ')),
+      first: [vis('panel-e-learning'), vis('panel-self-learning')] };
+    document.getElementById('tab-self-learning').click();
+    out.second = [vis('panel-e-learning'), vis('panel-self-learning'), document.getElementById('tab-self-learning').getAttribute('aria-selected')];
+    out.selfText = document.getElementById('panel-self-learning').innerText;
+    document.getElementById('tab-self-learning').focus();
+    document.getElementById('tab-self-learning').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+    out.third = [vis('panel-e-learning'), document.activeElement.id];
+    return out;
+  `);
+  const selfCards = await tab.evaluate(`
+    return [...document.querySelectorAll('#panel-self-learning .module-card')].map((c) => c.className + ':' + c.querySelector('.module-badge').textContent.trim());
+  `);
+  step('Self-Learning module cards use the E-Learning style: Mula, amber "1" badge, Penutup flag',
+    selfCards.join() === 'module-card is-intro:Mula,module-card:1,module-card is-outro:', JSON.stringify(selfCards));
+  step('landing Kandungan Kursus has E-Learning / Self-Learning tabs that switch panels (click and arrow keys)',
+    tabs.tabs.length === 2 && tabs.tabs[0].startsWith('E-Learning') && tabs.tabs[1].startsWith('Self-Learning')
+    && tabs.first.join() === 'true,false' && tabs.second.join() === 'false,true,true'
+    && tabs.selfText.includes('Pengenalan') && tabs.selfText.includes('VIDEO - 10:35') && tabs.selfText.includes('KUIZ - 10 SOALAN')
+    && tabs.selfText.includes('Penutup')
+    && tabs.third.join() === 'true,tab-e-learning', JSON.stringify(tabs));
+
   // Learner A on a shared computer: registers without "Ingat saya", completes the course, downloads, leaves.
   const a = await tab.evaluate(helpers + `
     await register('DrafA', false);
     const out = { hash: location.hash, inSession: !!sessionStorage.getItem('${KEY}'), inLocal: !!localStorage.getItem('${KEY}') };
+    out.chooseSignout = !!document.getElementById('signout-btn');
+    await go('#/kursus?track=e-learning');
     out.topbarSignout = !!document.getElementById('topbar-signout-btn');
     await go('#/kursus?lesson=kuiz-modul-1');
     out.quizLockedFirst = !!document.getElementById('lock-card') && !document.getElementById('quiz-form')
@@ -216,8 +244,8 @@ try {
     out.kursusHash = location.hash;
     return out;
   `);
-  step('A registers without Ingat saya: state in sessionStorage only, course page has Selesai / Keluar',
-    a.hash.startsWith('#/kursus') && a.inSession && !a.inLocal && a.topbarSignout, JSON.stringify(a).slice(0, 300));
+  step('A registers without Ingat saya: lands on #/pilih, state in sessionStorage only, pilih and course pages have Selesai / Keluar',
+    a.hash === '#/pilih' && a.inSession && !a.inLocal && a.chooseSignout && a.topbarSignout, JSON.stringify(a).slice(0, 300));
   step('Kuiz Modul 1 is locked before the Modul 1 lesson; completing Modul 1 leads to Kuiz Modul 1',
     a.quizLockedFirst && a.afterLesson1 === '#/kursus?lesson=kuiz-modul-1', JSON.stringify(a).slice(0, 300));
   step('Kuiz Modul 1 with one wrong answer: 2/3 (66.67%) GAGAL', a.failText.includes('Markah anda: 2/3 (66.67%)') && a.failText.includes('GAGAL'),
@@ -300,6 +328,122 @@ try {
   step('80 minutes reading Modul 4 (after Kuiz Modul 1-3) with slide clicks: not signed out, lesson saved', r.counter === '5/12' && r.done && r.name
     && r.hash === '#/kursus?lesson=kuiz-modul-4', JSON.stringify(r));
 
+  // Self-Learning: video (YouTube IFrame API replaced by a stub, no network) -> Kuiz Self-Learning -> certificate.
+  const sl = await tab.evaluate(helpers + `
+    await register('DrafS', false);
+    const out = { hash: location.hash, ctas: [...document.querySelectorAll('.track-card .track-cta')].map((a) => a.getAttribute('href')) };
+    const fake = { t: 0, d: 10, seeks: [], destroyed: 0 };
+    window.YT = { PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2 }, Player: function (host, cfg) {
+      fake.cfg = cfg;
+      const p = { getCurrentTime: () => fake.t, getDuration: () => fake.d, seekTo: (s) => { fake.seeks.push(s); fake.t = s; },
+        playVideo() {}, setPlaybackRate(r) { fake.rate = r; }, destroy() { fake.destroyed++; } };
+      setTimeout(() => cfg.events.onReady({ target: p }), 0);
+      return p;
+    } };
+    const tick = async (t) => { fake.t = t; await sleep(600); };
+    const watchText = () => document.getElementById('video-watch-text').textContent;
+    const btn = () => document.getElementById('complete-btn');
+    const s0 = JSON.parse(sessionStorage.getItem('${KEY}'));
+    out.storedName = s0.learner.full_name + '|' + ('first_name' in s0.learner);
+    await go('#/kursus?track=self-learning');
+    out.openHash = location.hash;
+    out.intro = (document.getElementById('video-lesson') || { dataset: {} }).dataset.youtube;
+    await go('#/kursus?lesson=self-penutup');
+    out.outroLocked = !!document.getElementById('lock-card') && text().includes('Penutup dibuka selepas anda lulus Kuiz Self-Learning.');
+    await go('#/kursus?track=self-learning');
+    out.poster = !!document.getElementById('video-play') && !document.querySelector('#video-lesson iframe') && btn().disabled;
+    out.active = (document.querySelector('.track-switch-btn.is-active') || {}).textContent;
+    await go('#/kursus?lesson=kuiz-self-learning');
+    out.quizLocked = !!document.getElementById('lock-card') && text().includes('Sila lengkapkan semua pelajaran dalam Modul 1: Video Kursus');
+    await go('#/kursus?lesson=self-video');
+    document.getElementById('video-play').click();
+    await sleep(50);
+    out.player = [document.getElementById('video-play').hidden, fake.cfg.videoId, fake.cfg.host, fake.cfg.playerVars.rel].join();
+    fake.cfg.events.onStateChange({ data: 1 });
+    await tick(2);
+    await tick(4);
+    await tick(9); // skip ahead
+    out.skip = [fake.seeks.join(), watchText().includes('tidak boleh dilangkau'), btn().disabled].join();
+    fake.t = 10;
+    fake.cfg.events.onStateChange({ data: 0 }); // reached the end by skipping
+    out.earlyEnd = [btn().disabled, fake.seeks.length].join();
+    fake.cfg.events.onStateChange({ data: 2 }); // pause saves the furthest point
+    out.saved = (JSON.parse(sessionStorage.getItem('${KEY}')).videoPos || {})['self-video'];
+    fake.cfg.events.onStateChange({ data: 1 });
+    await tick(6);
+    await tick(8);
+    await tick(10);
+    fake.cfg.events.onStateChange({ data: 0 });
+    out.finished = [btn().disabled, watchText().includes('Video selesai ditonton')].join();
+    document.getElementById('complete-form').requestSubmit();
+    await sleep(150);
+    out.afterVideo = location.hash;
+    out.destroyed = fake.destroyed;
+    // 7/10 fails, 10/10 passes and offers LENGKAP & TERUSKAN.
+    const answer = (wrong) => {
+      const qf = document.getElementById('quiz-form');
+      let i = 0;
+      for (const fs of qf.querySelectorAll('fieldset')) {
+        const q = fs.querySelector('input').name;
+        const v = i++ < wrong ? (ANS[q] === 'a' ? 'b' : 'a') : ANS[q];
+        qf.querySelector('input[name="' + q + '"][value="' + v + '"]').checked = true;
+      }
+      out.questions = i;
+      qf.requestSubmit();
+    };
+    answer(3);
+    await sleep(200);
+    out.failText = text();
+    await go('#/kursus?lesson=kuiz-self-learning');
+    answer(0);
+    await sleep(200);
+    out.passText = text();
+    await go('#/kursus?lesson=modul-2-pengenalan');
+    out.elearningLocked = !!document.getElementById('lock-card');
+    await go('#/kursus?lesson=kuiz-self-learning');
+    out.hasFinish = !!document.getElementById('finish-form');
+    return out;
+  `);
+  step('registration lands on Pilih Cara Belajar with E-Learning and Self-Learning buttons',
+    sl.hash === '#/pilih' && sl.ctas.join() === '#/kursus?track=e-learning,#/kursus?track=self-learning', JSON.stringify(sl).slice(0, 300));
+  step('Self-Learning opens at the video: poster button (no iframe yet), LENGKAP disabled, Kuiz Self-Learning locked',
+    sl.openHash === '#/kursus?track=self-learning' && sl.intro === 'Z4C82eyhwgU' && sl.outroLocked
+    && sl.poster && sl.active === 'Self-Learning' && sl.quizLocked, JSON.stringify(sl).slice(0, 300));
+  step('registration has one Nama Penuh field; the name is stored with spaces collapsed',
+    sl.storedName === 'Ujian DrafS|false', sl.storedName);
+  step('a click loads the youtube-nocookie player; skipping ahead jumps back and the end reached by skipping does not count',
+    sl.player === 'true,aqz-KE-bpKQ,https://www.youtube-nocookie.com,0' && sl.skip === '4,true,true' && sl.earlyEnd.startsWith('true,')
+    && sl.saved === 4, JSON.stringify(sl).slice(0, 400));
+  step('watched to the end: LENGKAP & TERUSKAN opens Kuiz Self-Learning and the player is stopped',
+    sl.finished === 'false,true' && sl.afterVideo === '#/kursus?lesson=kuiz-self-learning' && sl.destroyed >= 1, JSON.stringify(sl).slice(0, 400));
+  step('Kuiz Self-Learning: 10 questions, 7/10 GAGAL, 10/10 LULUS with LENGKAP & TERUSKAN; E-Learning modules stay locked',
+    sl.questions === 10 && sl.failText.includes('Markah anda: 7/10 (70%)') && sl.failText.includes('GAGAL')
+    && sl.passText.includes('Markah anda: 10/10 (100%)') && sl.elearningLocked, JSON.stringify(sl).slice(0, 400));
+
+  const sl2 = await tab.evaluate(helpers + `
+    const quiz = document.getElementById('finish-form');
+    const out = {};
+    if (!quiz) {
+      const id = JSON.parse(sessionStorage.getItem('${KEY}')).attempts.slice(-1)[0].id;
+      await go('#/kursus?lesson=kuiz-self-learning&attempt=' + id);
+    }
+    document.getElementById('finish-form').requestSubmit();
+    await sleep(200);
+    out.hash = location.hash;
+    out.cert = text().includes('Ujian DrafS');
+    await go('#/kursus?lesson=penutup');
+    out.penutupOpen = !document.getElementById('lock-card');
+    await go('#/kursus?lesson=self-penutup');
+    out.penutupOpen = out.penutupOpen && !document.getElementById('lock-card')
+      && document.getElementById('video-lesson').dataset.youtube === 'SkVqJ1SGeL0';
+    await go('#/pilih');
+    out.choose = text().includes('Kursus ini telah selesai');
+    delete window.YT;
+    return out;
+  `);
+  step('Self-Learning completion gives the certificate; E-Learning then counts as finished (Penutup open, pilih says selesai)',
+    sl2.hash === '#/sijil' && sl2.cert && sl2.penutupOpen && sl2.choose, JSON.stringify(sl2));
+
   await tab.evaluate(helpers + `await register('DrafC', false); return true;`);
   const tab2 = await openTab(base);
   const d = await tab2.evaluate(`return document.getElementById('app').innerText;`);
@@ -351,8 +495,8 @@ try {
       const base = { course_title: 'x', date_text: '23 November 2026', code: 'NADI-0123456789', issuer: 'NADI' };
       const names = [['Ali', 'Ahmad'], ['Siti Nur Aisyah Humaira Binti', 'Mohamad Abdul Rahman Shahrul Nizam Al-Haj Ismail Iskandar Zulkarnain Tengku Sulaiman']];
       const out = [];
-      for (const [first_name, last_name] of names) {
-        const canvas = await window.NADI_DRAFT.drawCertificate(Object.assign({ first_name, last_name }, base));
+      for (const [first, last] of names) {
+        const canvas = await window.NADI_DRAFT.drawCertificate(Object.assign({ name: first + ' ' + last }, base));
         out.push(canvas.toDataURL('image/png').split(',')[1]);
       }
       return out;

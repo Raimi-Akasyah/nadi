@@ -3,8 +3,12 @@
 
 CREATE TABLE IF NOT EXISTS learners (
     id INT UNSIGNED NOT NULL AUTO_INCREMENT,
-    first_name VARCHAR(100) NOT NULL,
-    last_name VARCHAR(100) NOT NULL,
+    -- The name printed on the certificate (registration asks for "Nama Penuh"). first_name and last_name are
+    -- from the older form with two name fields; new learners leave them empty.
+    -- Existing databases: import sql/migrate-full-name.sql to add this column.
+    full_name VARCHAR(200) NOT NULL DEFAULT '',
+    first_name VARCHAR(100) NOT NULL DEFAULT '',
+    last_name VARCHAR(100) NOT NULL DEFAULT '',
     age TINYINT UNSIGNED NOT NULL,
     email VARCHAR(190) NOT NULL,
     phone VARCHAR(20) NOT NULL,
@@ -13,7 +17,9 @@ CREATE TABLE IF NOT EXISTS learners (
     token_hash CHAR(64) NOT NULL,
     created_at DATETIME NOT NULL,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_learners_token_hash (token_hash)
+    UNIQUE KEY uq_learners_token_hash (token_hash),
+    KEY idx_learners_email (email),
+    KEY idx_learners_full_name (full_name(100))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Extra "Ingat saya" tokens, one per device where a learner resumed by e-mail with the box ticked.

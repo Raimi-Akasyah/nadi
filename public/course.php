@@ -4,14 +4,26 @@ declare(strict_types=1);
 require __DIR__ . '/../src/bootstrap.php';
 
 $learner = require_learner();
-$course = Course::load();
 $learnerId = (int)$learner['id'];
+
+// The track (E-Learning or Self-Learning): the one that owns ?lesson=, else ?track=, else the one last opened.
+$lessonKey = $_GET['lesson'] ?? null;
+$hasLessonKey = $lessonKey !== null && $lessonKey !== '';
+$course = $hasLessonKey && is_string($lessonKey) ? Course::forLesson($lessonKey) : null;
+if ($hasLessonKey && $course === null) {
+    abort(404, 'Pelajaran tidak dijumpai.');
+}
+if ($course === null) {
+    $track = $_GET['track'] ?? null;
+    $course = Course::load(Course::isTrack($track) ? $track : current_track());
+}
+remember_track($course->track());
+
 $passed = learner_passed_quizzes($course, $learnerId);
 // A passed quiz counts as a completed lesson (also for learners who passed the old Kuiz Akhir).
 $done = array_flip(progress_keys($learnerId)) + $passed;
 
-$lessonKey = $_GET['lesson'] ?? null;
-if ($lessonKey === null || $lessonKey === '') {
+if (!$hasLessonKey) {
     $lesson = null;
     foreach ($course->lessons() as $l) {
         if (!isset($done[$l['key']])) {
@@ -23,10 +35,7 @@ if ($lessonKey === null || $lessonKey === '') {
         $lesson = $course->lessons()[0];
     }
 } else {
-    $lesson = is_string($lessonKey) ? $course->lesson($lessonKey) : null;
-    if ($lesson === null) {
-        abort(404, 'Pelajaran tidak dijumpai.');
-    }
+    $lesson = $course->lesson($lessonKey);
 }
 
 $slideCount = $lesson['type'] === 'presentation' ? count($lesson['slides']) : 0;
@@ -36,14 +45,7 @@ if ($slideCount > 0) {
     $slide = max(1, min($slideCount, $requested === false ? 1 : (int)$requested));
 }
 
-$allLessons = $course->lessons();
-$completedCount = 0;
-foreach ($allLessons as $l) {
-    if (isset($done[$l['key']])) {
-        $completedCount++;
-    }
-}
-$percent = count($allLessons) > 0 ? (int)round($completedCount * 100 / count($allLessons)) : 0;
+$percent = $course->percentDone($done);
 
 $lock = $course->lockReason($lesson, $done, $passed);
 
@@ -53,6 +55,9 @@ $attemptNo = 0;
 $completion = null;
 if ($lock !== null) {
     http_response_code(403);
+} elseif ($lesson['type'] === 'video') {
+    // Starts the server-side clock for "watched to the end" (see lesson-complete.php).
+    video_mark_opened($learnerId, $lesson['key']);
 } elseif ($lesson['type'] === 'quiz') {
     $quiz = $course->quiz($lesson['key']);
     $completion = completion_find($learnerId, $course->key());
@@ -72,6 +77,7 @@ render('course', [
     'hideHeader' => true,
     'scripts'    => ['assets/js/course.js'],
     'course'     => $course,
+    'tracks'     => Course::all(),
     'learner'    => $learner,
     'lesson'     => $lesson,
     'done'       => $done,

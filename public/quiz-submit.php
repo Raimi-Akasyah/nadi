@@ -4,10 +4,10 @@ require __DIR__ . '/../src/bootstrap.php';
 post_only();
 csrf_verify();
 $learner = require_learner();
-$course = Course::load();
 $learnerId = (int)$learner['id'];
 $key = $_POST['quiz'] ?? '';
-$lesson = is_string($key) ? $course->lesson($key) : null;
+$course = is_string($key) ? Course::forLesson($key) : null;
+$lesson = $course !== null ? $course->lesson($key) : null;
 if ($lesson === null || $lesson['type'] !== 'quiz') {
     abort(400, 'Kuiz tidak sah.');
 }

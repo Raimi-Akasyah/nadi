@@ -1,5 +1,6 @@
 <?php
 /** @var Course $course */
+/** @var Course[] $tracks */
 /** @var array $learner */
 /** @var array $lesson */
 /** @var array $done */
@@ -31,7 +32,7 @@ foreach ($course->sections() as $section) {
         break;
     }
 }
-$initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_substr(trim($learner['last_name']), 0, 1));
+$initials = name_initials(learner_name($learner));
 ?>
 <header class="topbar">
     <div class="topbar-left">
@@ -44,7 +45,7 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
     <a class="topbar-logo" href="index.php"><img src="assets/img/logo.svg" alt="NADI" width="96" height="32"></a>
     <div class="topbar-right">
         <span class="avatar avatar-sm" aria-hidden="true"><?= e($initials) ?></span>
-        <span class="topbar-user"><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></span>
+        <span class="topbar-user"><?= e(learner_name($learner)) ?></span>
         <form method="post" action="reset.php" class="inline-form">
             <?= csrf_field() ?>
             <button type="submit" class="btn btn-outline btn-sm">Selesai / Keluar</button>
@@ -55,6 +56,15 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
 <div class="course-layout">
     <aside class="sidebar" id="course-sidebar" aria-label="Kandungan kursus">
         <h2 class="sidebar-title"><?= e($course->title()) ?></h2>
+        <nav class="track-switch" aria-label="Cara belajar">
+            <?php foreach ($tracks as $t):
+                $isTrack = $t->track() === $course->track();
+            ?>
+                <a class="track-switch-btn<?= $isTrack ? ' is-active' : '' ?>" href="course.php?<?= e(http_build_query(['track' => $t->track()])) ?>"<?= $isTrack ? ' aria-current="true"' : '' ?>>
+                    <?= icon($t->track() === 'self-learning' ? 'video' : 'slides') ?><?= e($t->trackTitle()) ?>
+                </a>
+            <?php endforeach; ?>
+        </nav>
         <div class="progress<?= $percent >= 100 ? ' is-complete' : '' ?>">
             <div class="progress-text"><?= e($percent) ?>% selesai</div>
             <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= e($percent) ?>">
@@ -101,7 +111,7 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
                                     <span class="lesson-meta">
                                         <span class="lesson-title"><?= e($l['title']) ?></span>
                                         <span class="lesson-tags">
-                                            <span class="lesson-label"><?= icon($isQuiz ? 'quiz' : 'slides') ?><?= e($course->lessonLabel($l)) ?></span>
+                                            <span class="lesson-label"><?= icon(Course::lessonIcon($l)) ?><?= e($course->lessonLabel($l)) ?></span>
                                             <?php if ($isQuiz): ?>
                                                 <span class="lesson-status<?= $isPassed ? ' is-pass' : '' ?>"><?= $isPassed ? 'LULUS' : 'BELUM LULUS' ?></span>
                                             <?php endif; ?>
@@ -129,7 +139,7 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
                     <p class="lesson-eyebrow"><?= e($sectionTitle) ?></p>
                     <h1><?= e($lesson['title']) ?></h1>
                 </div>
-                <span class="lesson-label"><?= icon($lesson['type'] === 'quiz' ? 'quiz' : 'slides') ?><?= e($course->lessonLabel($lesson)) ?></span>
+                <span class="lesson-label"><?= icon(Course::lessonIcon($lesson)) ?><?= e($course->lessonLabel($lesson)) ?></span>
             </div>
             <div class="card quiz-gate lock-card">
                 <div class="lock-art" aria-hidden="true">
@@ -198,6 +208,49 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
                     </form>
                 </div>
             </div>
+        <?php elseif ($lesson['type'] === 'video'):
+            $videoDone = isset($done[$lesson['key']]);
+            $duration = (int)$lesson['duration'];
+        ?>
+            <div class="lesson-header">
+                <div class="lesson-heading">
+                    <p class="lesson-eyebrow"><?= e($sectionTitle) ?></p>
+                    <h1><?= e($lesson['title']) ?></h1>
+                </div>
+                <span class="lesson-label"><?= icon('video') ?><?= e($course->lessonLabel($lesson)) ?></span>
+            </div>
+
+            <div class="video-lesson" id="video-lesson" data-youtube="<?= e($lesson['youtube']) ?>" data-duration="<?= e($duration) ?>"
+                 data-done="<?= $videoDone ? '1' : '0' ?>" data-progress-key="<?= e(video_progress_key((int)$learner['id'], $lesson['key'])) ?>">
+                <div class="video-frame">
+                    <div class="video-player" id="video-player"></div>
+                    <button type="button" class="video-facade" id="video-play">
+                        <img class="video-facade-blob" src="assets/img/blob-orange.svg" alt="" width="487" height="354">
+                        <img class="video-facade-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294">
+                        <span class="video-facade-title"><?= e($lesson['title']) ?></span>
+                        <span class="video-facade-play" aria-hidden="true"><?= icon('play') ?></span>
+                        <span class="video-facade-cta">Main video</span>
+                        <span class="video-facade-time"><?= e(format_duration($duration)) ?></span>
+                    </button>
+                </div>
+                <div class="video-bar">
+                    <div class="video-watch">
+                        <p class="video-watch-text" id="video-watch-text" aria-live="polite"><?= $videoDone
+                            ? 'Video ini telah ditonton sampai habis.'
+                            : 'Ditonton 0:00 / ' . e(format_duration($duration)) ?></p>
+                        <div class="progress-bar" aria-hidden="true"><span id="video-watch-bar" style="width: <?= $videoDone ? '100' : '0' ?>%"></span></div>
+                    </div>
+                    <form method="post" action="lesson-complete.php" class="complete-form">
+                        <?= csrf_field() ?>
+                        <input type="hidden" name="lesson" value="<?= e($lesson['key']) ?>">
+                        <button type="submit" class="btn btn-primary" id="complete-btn"<?= $videoDone ? '' : ' disabled' ?>>LENGKAP &amp; TERUSKAN</button>
+                        <span class="complete-hint">Tonton video sampai habis untuk teruskan</span>
+                    </form>
+                </div>
+                <noscript><p class="alert alert-warning video-noscript">Video ini memerlukan JavaScript. Sila hidupkan JavaScript dalam pelayar anda.</p></noscript>
+            </div>
+            <p class="muted small video-note"><?= icon('info') ?>Video tidak boleh dilangkau ke hadapan pada tontonan pertama. Anda boleh
+                menukar kelajuan sehingga 2x melalui tetapan video.</p>
         <?php else: ?>
             <div class="lesson-header">
                 <div class="lesson-heading">
@@ -237,6 +290,7 @@ $initials = mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_sub
                             <p>Tahniah! Tekan butang di bawah untuk menghantar penyelesaian kursus dan mendapatkan sijil anda.</p>
                             <form method="post" action="complete.php">
                                 <?= csrf_field() ?>
+                                <input type="hidden" name="track" value="<?= e($course->track()) ?>">
                                 <button type="submit" class="btn btn-primary btn-lg btn-block">LENGKAP &amp; TERUSKAN</button>
                             </form>
                         <?php else: ?>

@@ -10,10 +10,13 @@
   // The drawer CSS (course sidebar below 960px) applies only under html.js, as in views/layout.php.
   document.documentElement.classList.add('js');
 
-  // ---- Content (keep in sync with content/course.php and content/quiz.php) ----
+  // ---- Content (keep in sync with content/course.php, content/self-learning.php and content/quiz.php) ----
+  // E-Learning track (slides).
   var COURSE = {
     key: 'ai-essentials',
     title: 'Malaysia AWS AI Essentials',
+    track: 'e-learning',
+    trackTitle: 'E-Learning',
     sections: [
       { key: 'pengenalan', title: 'Pengenalan', lessons: [
         { key: 'pengenalan', title: 'Pengenalan', type: 'presentation', slides: [
@@ -89,6 +92,27 @@
     ]
   };
 
+  // Self-Learning track (video, then one quiz). Same key and title: one completion and one certificate.
+  // The videos are PLACEHOLDERS (Blender Foundation open movies, CC BY), as in content/self-learning.php.
+  var SELF = {
+    key: 'ai-essentials',
+    title: 'Malaysia AWS AI Essentials',
+    track: 'self-learning',
+    trackTitle: 'Self-Learning',
+    sections: [
+      { key: 'pengenalan', title: 'Pengenalan', lessons: [
+        { key: 'self-pengenalan', title: 'Video Pengenalan (Contoh)', type: 'video', youtube: 'Z4C82eyhwgU', duration: 146 }
+      ] },
+      { key: 'modul-1', title: 'Modul 1: Video Kursus', lessons: [
+        { key: 'self-video', title: 'Video Kursus (Contoh)', type: 'video', youtube: 'aqz-KE-bpKQ', duration: 635 },
+        { key: 'kuiz-self-learning', title: 'Kuiz Self-Learning', type: 'quiz', quiz: 'self-learning' }
+      ] },
+      { key: 'penutup', title: 'Penutup', lessons: [
+        { key: 'self-penutup', title: 'Video Penutup (Contoh)', type: 'video', youtube: 'SkVqJ1SGeL0', duration: 150 }
+      ] }
+    ]
+  };
+
   // In this draft the answers are in the browser. The real portal grades on the server.
   var QUIZ = {
     passMark: 75,
@@ -122,9 +146,15 @@
           options: { a: 'Terus kongsi tanpa semakan', b: 'Padam semua sumber', c: 'Semak ketepatan maklumat tersebut', d: 'Tukar fon tulisan' } },
         { id: 'q10', text: 'Antara berikut, yang manakah amalan AI yang bertanggungjawab?', answer: 'c',
           options: { a: 'Memasukkan data peribadi orang lain tanpa izin', b: 'Menggunakan AI untuk menyebarkan berita palsu', c: 'Melindungi privasi dan menggunakan AI secara beretika', d: 'Mempercayai semua output AI sepenuhnya' } }
-      ] }
+      ] },
+      // Asks the questions of the listed module quizzes, in that order.
+      'self-learning': { title: 'Kuiz Self-Learning', from: ['modul-1', 'modul-2', 'modul-3', 'modul-4', 'modul-5'] }
     }
   };
+  Object.keys(QUIZ.quizzes).forEach(function (k) {
+    var q = QUIZ.quizzes[k];
+    if (q.from) q.questions = [].concat.apply([], q.from.map(function (f) { return QUIZ.quizzes[f].questions; }));
+  });
 
   var ISSUER = 'NADI'; // PDF author only
 
@@ -148,42 +178,68 @@
   };
   var MONTHS = ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'];
 
-  // ---- Course helpers ----
-  var LESSONS = [];
-  COURSE.sections.forEach(function (s) {
-    s.lessons.forEach(function (l) { l.sectionKey = s.key; LESSONS.push(l); });
-  });
+  // ---- Tracks and course helpers (src/Course.php) ----
+  // A track is one of COURSE (E-Learning) or SELF (Self-Learning) with its lessons in order.
+  function makeTrack(c) {
+    var lessons = [];
+    c.sections.forEach(function (s) {
+      s.lessons.forEach(function (l) { l.sectionKey = s.key; l.track = c.track; lessons.push(l); });
+    });
+    var quizLessons = lessons.filter(function (l) { return l.type === 'quiz'; });
+    return { key: c.track, title: c.trackTitle, sections: c.sections, lessons: lessons,
+      quizLessons: quizLessons, lastQuiz: quizLessons[quizLessons.length - 1] };
+  }
+  var TRACKS = [makeTrack(COURSE), makeTrack(SELF)];
+  function trackByKey(key) {
+    for (var i = 0; i < TRACKS.length; i++) if (TRACKS[i].key === key) return TRACKS[i];
+    return null;
+  }
+  // The track the learner last opened (current_track() in src/helpers.php).
+  function currentTrack() { return trackByKey(state.track) || TRACKS[0]; }
   function lessonByKey(key) {
-    for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].key === key) return LESSONS[i];
+    for (var t = 0; t < TRACKS.length; t++) {
+      for (var i = 0; i < TRACKS[t].lessons.length; i++) if (TRACKS[t].lessons[i].key === key) return TRACKS[t].lessons[i];
+    }
     return null;
   }
+  function trackOf(lesson) { return trackByKey(lesson.track); }
   function nextLesson(key) {
-    for (var i = 0; i < LESSONS.length; i++) if (LESSONS[i].key === key) return LESSONS[i + 1] || null;
-    return null;
+    var l = lessonByKey(key);
+    if (!l) return null;
+    var list = trackOf(l).lessons;
+    return list[list.indexOf(l) + 1] || null;
   }
-  function sectionLessons(key) {
-    return LESSONS.filter(function (l) { return l.sectionKey === key; });
+  function sectionLessons(T, key) {
+    return T.lessons.filter(function (l) { return l.sectionKey === key; });
   }
-  function sectionIndex(key) {
-    for (var i = 0; i < COURSE.sections.length; i++) if (COURSE.sections[i].key === key) return i;
+  function sectionIndex(T, key) {
+    for (var i = 0; i < T.sections.length; i++) if (T.sections[i].key === key) return i;
     return -1;
   }
-  var QUIZ_LESSONS = LESSONS.filter(function (l) { return l.type === 'quiz'; });
-  var LAST_QUIZ = QUIZ_LESSONS[QUIZ_LESSONS.length - 1];
   // Attempts saved before the module quizzes have no quiz key: they were the old Kuiz Akhir (all 10 questions).
   var LEGACY_QUIZ_KEY = 'kuiz-akhir';
   function quizOf(lesson) { return QUIZ.quizzes[lesson.quiz]; }
-  function lessonLabel(l) {
-    return l.type === 'quiz' ? 'KUIZ - ' + quizOf(l).questions.length + ' SOALAN' : 'PEMBENTANGAN';
+  function formatDuration(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    return (h > 0 ? h + ':' + pad(m) : String(m)) + ':' + pad(s);
   }
-  // Passed quiz lessons (key -> true). A completion or a passed legacy attempt counts as all passed
-  // (Course::effectivePassed in src/Course.php).
-  function passedSet() {
+  function lessonLabel(l) {
+    if (l.type === 'quiz') return 'KUIZ - ' + quizOf(l).questions.length + ' SOALAN';
+    if (l.type === 'video') return 'VIDEO - ' + formatDuration(l.duration);
+    return 'PEMBENTANGAN';
+  }
+  function lessonIcon(l) { return l.type === 'quiz' ? 'quiz' : (l.type === 'video' ? 'video' : 'slides'); }
+  // Passed quiz lessons of track T (key -> true). A completion (either track) or a passed legacy attempt counts
+  // as all passed (Course::effectivePassed in src/Course.php).
+  function passedSet(T) {
     var legacy = !!state.completion || state.attempts.some(function (a) {
       return a.passed && (!a.quiz || a.quiz === LEGACY_QUIZ_KEY);
     });
     var out = {};
-    QUIZ_LESSONS.forEach(function (l) {
+    T.quizLessons.forEach(function (l) {
       if (legacy || state.attempts.some(function (a) { return a.passed && a.quiz === l.key; })) out[l.key] = true;
     });
     return out;
@@ -195,29 +251,33 @@
     Object.keys(passed).forEach(function (k) { out[k] = true; });
     return out;
   }
-  function firstUnpassedQuiz(passed) {
-    for (var i = 0; i < QUIZ_LESSONS.length; i++) if (!passed[QUIZ_LESSONS[i].key]) return QUIZ_LESSONS[i];
+  function firstUnpassedQuiz(T, passed) {
+    for (var i = 0; i < T.quizLessons.length; i++) if (!passed[T.quizLessons[i].key]) return T.quizLessons[i];
     return null;
   }
-  function allQuizzesPassed(passed) { return firstUnpassedQuiz(passed) === null; }
-  // Why a lesson is locked ({ message, links }) or null when open. Same rules as Course::lockReason().
-  function lockReason(lesson, done, passed) {
-    if (!QUIZ_LESSONS.length) return null;
-    var own = sectionIndex(lesson.sectionKey);
+  function allQuizzesPassed(T, passed) { return firstUnpassedQuiz(T, passed) === null; }
+  // Why a lesson of track T is locked ({ message, links }) or null when open. Same rules as Course::lockReason().
+  function lockReason(T, lesson, done, passed) {
+    if (!T.quizLessons.length) return null;
+    var own = sectionIndex(T, lesson.sectionKey);
     var prevQuiz = null;
-    QUIZ_LESSONS.forEach(function (q) { if (sectionIndex(q.sectionKey) < own) prevQuiz = q; });
-    if (own > sectionIndex(LAST_QUIZ.sectionKey)) {
-      var first = firstUnpassedQuiz(passed);
-      return first ? { message: 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).', links: [first] } : null;
+    T.quizLessons.forEach(function (q) { if (sectionIndex(T, q.sectionKey) < own) prevQuiz = q; });
+    if (own > sectionIndex(T, T.lastQuiz.sectionKey)) {
+      var first = firstUnpassedQuiz(T, passed);
+      return first ? {
+        message: T.quizLessons.length === 1 ? 'Penutup dibuka selepas anda lulus ' + T.quizLessons[0].title + '.'
+          : 'Penutup dibuka selepas anda lulus kesemua kuiz modul (Modul 1 hingga Modul 5).',
+        links: [first]
+      } : null;
     }
     if (prevQuiz && !passed[prevQuiz.key]) {
       return { message: 'Modul ini dikunci. Sila lulus ' + prevQuiz.title + ' terlebih dahulu.', links: [prevQuiz] };
     }
     if (lesson.type === 'quiz') {
-      var missing = sectionLessons(lesson.sectionKey).filter(function (l) { return l.type !== 'quiz' && !done[l.key]; });
+      var missing = sectionLessons(T, lesson.sectionKey).filter(function (l) { return l.type !== 'quiz' && !done[l.key]; });
       if (missing.length) {
         return {
-          message: 'Sila lengkapkan semua pelajaran dalam ' + COURSE.sections[own].title + ' sebelum menjawab kuiz ini.',
+          message: 'Sila lengkapkan semua pelajaran dalam ' + T.sections[own].title + ' sebelum menjawab kuiz ini.',
           links: missing
         };
       }
@@ -225,8 +285,12 @@
     return null;
   }
   function currentLock(lesson) {
-    var passed = passedSet();
-    return lockReason(lesson, doneSet(passed), passed);
+    var T = trackOf(lesson);
+    var passed = passedSet(T);
+    return lockReason(T, lesson, doneSet(passed), passed);
+  }
+  function percentDone(T, done) {
+    return Math.round(T.lessons.filter(function (l) { return done[l.key]; }).length * 100 / T.lessons.length);
   }
 
   // ---- State ----
@@ -238,7 +302,8 @@
   var IDLE_MS = 30 * 60 * 1000; // LEARNER_IDLE_MINUTES in src/helpers.php
   var REMEMBER_MS = 30 * 86400 * 1000; // LEARNER_COOKIE_DAYS in src/helpers.php
   function emptyState() {
-    return { learner: null, done: {}, attempts: [], completion: null, remember: false, rememberUntil: 0, lastActive: 0 };
+    return { learner: null, done: {}, attempts: [], completion: null, remember: false, rememberUntil: 0, lastActive: 0,
+      track: null, videoPos: {} };
   }
   function storage(remember) {
     try { return remember ? window.localStorage : window.sessionStorage; } catch (e) { return null; }
@@ -274,7 +339,9 @@
       completion: s.completion || null,
       remember: remember,
       rememberUntil: remember ? s.rememberUntil : 0,
-      lastActive: typeof s.lastActive === 'number' ? s.lastActive : 0
+      lastActive: typeof s.lastActive === 'number' ? s.lastActive : 0,
+      track: typeof s.track === 'string' ? s.track : null,
+      videoPos: s.videoPos && typeof s.videoPos === 'object' ? s.videoPos : {}
     };
   }
   var state = load();
@@ -314,7 +381,7 @@
   });
   // The real portal lets a learner continue on any device by entering their e-mail ("Sambung Semula").
   // This draft has no server, so it says so instead of pretending.
-  var RESUME_DRAFT_NOTE = '"Sambung Semula" dengan e-mel hanya berfungsi dalam portal sebenar. ' +
+  var RESUME_DRAFT_NOTE = '"Sambung Semula" dengan nama penuh atau e-mel hanya berfungsi dalam portal sebenar. ' +
     'Draf ini tiada pelayan: kemajuan anda disimpan dalam pelayar ini sahaja dan tidak boleh disambung ' +
     'pada peranti atau pelayar lain.';
   var justSignedOut = false;
@@ -347,7 +414,13 @@
     for (var i = 0; i < bytes.length; i++) hex += (bytes[i] < 16 ? '0' : '') + bytes[i].toString(16);
     return 'NADI-' + hex.toUpperCase();
   }
-  function fullName() { return state.learner ? state.learner.first_name + ' ' + state.learner.last_name : ''; }
+  // learner_name() in src/helpers.php: full_name, or first + last name in state saved by an older draft.
+  function fullName() {
+    if (!state.learner) return '';
+    var l = state.learner;
+    return String(l.full_name || '').trim() || (String(l.first_name || '').trim() + ' ' + String(l.last_name || '').trim()).trim();
+  }
+  function normalizeName(s) { return String(s || '').replace(/\s+/g, ' ').trim(); }
   function courseHref(key, slide) {
     return '#/kursus?lesson=' + encodeURIComponent(key) + (slide ? '&slide=' + slide : '');
   }
@@ -374,19 +447,30 @@
   var app = document.getElementById('app');
   var viewerCtl = null; // slide viewer controller for keyboard navigation
 
+  var activeVideo = null; // video player of the current page, stopped on every route change
+
   function render() {
     var r = parseHash();
     viewerCtl = null;
+    if (activeVideo) {
+      activeVideo.destroy();
+      activeVideo = null;
+    }
     document.body.className = '';
     if (!expireIfIdle() && state.learner) save();
     if (r.path === '/daftar') return renderRegister();
+    if (r.path === '/pilih') {
+      if (!state.learner) return go('#/daftar');
+      return renderChoose();
+    }
     if (r.path === '/kursus') {
       if (!state.learner) return go('#/daftar');
       return renderCourse(r.params);
     }
     if (r.path === '/sijil') {
       if (!state.learner) return go('#/daftar');
-      if (!state.completion) return go(courseHref((firstUnpassedQuiz(passedSet()) || LAST_QUIZ).key));
+      var T = currentTrack();
+      if (!state.completion) return go(courseHref((firstUnpassedQuiz(T, passedSet(T)) || T.lastQuiz).key));
       return renderCertificate();
     }
     return renderLanding();
@@ -417,7 +501,9 @@
     search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>',
     shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
     slides: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/><path d="m10.5 8 4 2-4 2z"/>',
-    user: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/>'
+    user: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/>',
+    video: '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
+    play: '<path d="M8 5.5v13l10.5-6.5z"/>'
   };
   function icon(name, cls) {
     return '<svg class="icon' + (cls ? ' ' + cls : '') + '" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"' +
@@ -426,7 +512,8 @@
   }
   function initials() {
     if (!state.learner) return '';
-    return (String(state.learner.first_name).trim().charAt(0) + String(state.learner.last_name).trim().charAt(0)).toUpperCase();
+    // name_initials() in src/helpers.php: first letters of the first two words.
+    return fullName().split(' ').filter(Boolean).slice(0, 2).map(function (w) { return w.charAt(0); }).join('').toUpperCase();
   }
   var BLOBS = '<img class="blob blob-tr" src="assets/img/blob-orange.svg" alt="" aria-hidden="true" width="487" height="354">' +
     '<img class="blob blob-bl" src="assets/img/blob-amber.svg" alt="" aria-hidden="true" width="425" height="309">';
@@ -458,22 +545,83 @@
   // Same markup as views/landing.php. The draft has no "Sambung Semula" form: its card explains why.
   var STEPS = [
     ['user', 'Daftar', 'Isi maklumat asas anda. Tiada akaun atau kata laluan.'],
-    ['book', 'Belajar', 'Ikuti slaid setiap modul mengikut kadar anda sendiri, di telefon atau komputer.'],
-    ['clipboard', 'Kuiz', 'Lulus kuiz modul untuk membuka modul yang seterusnya.'],
+    ['book', 'Pilih & belajar', 'Pilih E-Learning (slaid) atau Self-Learning (video), di telefon atau komputer.'],
+    ['clipboard', 'Kuiz', 'Lulus kuiz dengan markah sekurang-kurangnya ' + QUIZ.passMark + '%. Cubaan tanpa had.'],
     ['award', 'Sijil', 'Muat turun sijil penyelesaian (PDF) dengan nama anda.']
   ];
+  // Track descriptions (track_info() in views/tracks.php).
+  function trackInfo(T) {
+    var questions = T.quizLessons.reduce(function (n, q) { return n + quizOf(q).questions.length; }, 0);
+    if (T.key === 'self-learning') {
+      var videos = T.lessons.filter(function (l) { return l.type === 'video'; });
+      var seconds = videos.reduce(function (n, l) { return n + l.duration; }, 0);
+      return { icon: 'video', tagline: 'Belajar dengan video',
+        text: 'Tonton video kursus sampai habis, kemudian jawab satu kuiz yang merangkumi semua modul.',
+        facts: [videos.length + ' video (' + formatDuration(seconds) + ')', T.quizLessons.length + ' kuiz, ' + questions + ' soalan'],
+        cta: 'Self-Learning' };
+    }
+    return { icon: 'slides', tagline: 'Belajar dengan slaid',
+      text: 'Ikuti slaid setiap modul mengikut kadar anda. Setiap modul ada kuiz pendek, dan modul seterusnya dibuka selepas anda lulus.',
+      facts: [T.quizLessons.length + ' modul', T.quizLessons.length + ' kuiz, ' + questions + ' soalan'],
+      cta: 'E-Learning' };
+  }
+  // "Kandungan Kursus" with E-Learning / Self-Learning tabs (views/landing.php, public/assets/js/tabs.js).
+  function contentTabs() {
+    var tabs = TRACKS.map(function (T, i) {
+      var info = trackInfo(T);
+      return '<button type="button" class="track-tab" role="tab" id="tab-' + T.key + '" aria-controls="panel-' + T.key + '"' +
+        ' aria-selected="' + (i === 0 ? 'true' : 'false') + '"' + (i === 0 ? '' : ' tabindex="-1"') + '>' +
+        '<span class="track-tab-icon" aria-hidden="true">' + icon(info.icon) + '</span>' +
+        '<span class="track-tab-text"><span class="track-tab-title">' + e(T.title) + '</span>' +
+        '<span class="track-tab-sub">' + e(info.tagline) + '</span></span></button>';
+    }).join('');
+    var panels = TRACKS.map(function (T) {
+      var info = trackInfo(T);
+      var cards = T.sections.map(function (s) {
+        var isModule = s.key.indexOf('modul-') === 0;
+        var isIntro = s.key === 'pengenalan';
+        return '<li class="module-card' + (isModule ? '' : (isIntro ? ' is-intro' : ' is-outro')) + '">' +
+          '<span class="module-badge" aria-hidden="true">' + (isModule ? e(s.key.slice(6)) : (isIntro ? 'Mula' : icon('flag'))) + '</span>' +
+          '<div class="module-body"><h4 class="module-title">' + e(s.title) + '</h4><ul class="chip-list">' +
+          s.lessons.map(function (l) {
+            return '<li class="chip' + (l.type === 'quiz' ? ' chip-quiz' : '') + '">' + icon(lessonIcon(l)) + e(lessonLabel(l)) + '</li>';
+          }).join('') + '</ul></div></li>';
+      }).join('');
+      return '<div class="track-panel" role="tabpanel" id="panel-' + T.key + '" aria-labelledby="tab-' + T.key + '" tabindex="0">' +
+        '<div class="track-panel-head"><h3 class="track-panel-title">' + e(T.title) + ': ' + e(info.tagline) + '</h3>' +
+        '<p class="muted">' + e(info.text) + '</p></div><ol class="module-grid">' + cards + '</ol></div>';
+    }).join('');
+    return '<div class="track-tabs" role="tablist" aria-label="Cara belajar" data-tabs>' + tabs + '</div>' + panels;
+  }
+  function bindTabs() {
+    var tabs = app.querySelectorAll('[data-tabs] [role="tab"]');
+    function select(tab, focus) {
+      for (var i = 0; i < tabs.length; i++) {
+        var on = tabs[i] === tab;
+        tabs[i].setAttribute('aria-selected', on ? 'true' : 'false');
+        tabs[i].tabIndex = on ? 0 : -1;
+        document.getElementById(tabs[i].getAttribute('aria-controls')).hidden = !on;
+      }
+      if (focus) tab.focus();
+    }
+    for (var i = 0; i < tabs.length; i++) tabs[i].addEventListener('click', function (ev) { select(ev.currentTarget, false); });
+    var list = app.querySelector('[data-tabs]');
+    if (list) {
+      list.addEventListener('keydown', function (ev) {
+        var idx = Array.prototype.indexOf.call(tabs, document.activeElement);
+        if (idx === -1) return;
+        var next = null;
+        if (ev.key === 'ArrowRight') next = tabs[(idx + 1) % tabs.length];
+        else if (ev.key === 'ArrowLeft') next = tabs[(idx - 1 + tabs.length) % tabs.length];
+        else if (ev.key === 'Home') next = tabs[0];
+        else if (ev.key === 'End') next = tabs[tabs.length - 1];
+        if (next) { ev.preventDefault(); select(next, true); }
+      });
+    }
+    if (tabs.length) select(tabs[0], false);
+  }
   function renderLanding() {
     var moduleCount = COURSE.sections.filter(function (s) { return s.key.indexOf('modul') === 0; }).length;
-    var modules = COURSE.sections.map(function (s) {
-      var isModule = s.key.indexOf('modul-') === 0;
-      var isIntro = s.key === 'pengenalan';
-      return '<li class="module-card' + (isModule ? '' : (isIntro ? ' is-intro' : ' is-outro')) + '">' +
-        '<span class="module-badge" aria-hidden="true">' + (isModule ? e(s.key.slice(6)) : (isIntro ? 'Mula' : icon('flag'))) + '</span>' +
-        '<div class="module-body"><h3 class="module-title">' + e(s.title) + '</h3><ul class="chip-list">' +
-        s.lessons.map(function (l) {
-          return '<li class="chip' + (l.type === 'quiz' ? ' chip-quiz' : '') + '">' + icon(l.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(l)) + '</li>';
-        }).join('') + '</ul></div></li>';
-    }).join('');
     var steps = STEPS.map(function (s, i) {
       return '<li class="step"><span class="step-icon">' + icon(s[0]) + '<span class="step-num">' + (i + 1) + '</span></span>' +
         '<h3>' + e(s[1]) + '</h3><p>' + e(s[2]) + '</p></li>';
@@ -482,7 +630,7 @@
     if (state.learner) {
       actions = '<div class="greeting-card"><span class="avatar" aria-hidden="true">' + e(initials()) + '</span>' +
         '<p>Selamat kembali, <strong>' + e(fullName()) + '</strong>.</p></div>' +
-        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/kursus">Teruskan Kursus ' + icon('arrow') + '</a>' +
+        '<div class="hero-actions"><a class="btn btn-primary btn-lg" href="#/pilih">Teruskan Kursus ' + icon('arrow') + '</a>' +
         '<button type="button" class="btn-link" id="reset-btn">Bukan anda? Mula semula</button></div>';
     } else {
       actions = (justSignedOut ? '<div class="alert alert-success" role="status">Anda telah keluar. Maklumat anda tidak lagi dipaparkan pada peranti ini.</div>' : '') +
@@ -492,7 +640,7 @@
     var resumeCard = state.learner ? '' :
       '<section class="section" id="sambung-semula"><div class="container"><div class="card resume-card">' +
       '<div class="resume-copy"><span class="resume-icon">' + icon('refresh') + '</span><h2>Sambung Semula</h2>' +
-      '<p class="muted">Dalam portal sebenar, anda boleh menyambung kemajuan, kuiz dan sijil anda dengan e-mel anda sahaja.</p></div>' +
+      '<p class="muted">Dalam portal sebenar, anda boleh menyambung kemajuan, kuiz dan sijil anda dengan nama penuh atau e-mel anda.</p></div>' +
       '<div class="resume-body"><p class="alert alert-info">' + RESUME_DRAFT_NOTE + '</p></div>' +
       '</div></div></section>';
     setPage('', siteHeader() +
@@ -502,11 +650,12 @@
       '<h1>' + e(COURSE.title) + '</h1>' +
       '<span class="dots" aria-hidden="true"></span>' +
       '<p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri. ' +
-      'Lengkapkan kelima-lima modul dan lulus kuiz di hujung setiap modul dengan markah sekurang-kurangnya ' + QUIZ.passMark +
+      'Pilih E-Learning (slaid lima modul, lulus kuiz di hujung setiap modul) atau Self-Learning (tonton video, ' +
+      'kemudian satu kuiz). Dapatkan markah sekurang-kurangnya ' + QUIZ.passMark +
       '% untuk muat turun sijil penyelesaian anda.</p>' + actions +
       '<ul class="stat-strip">' +
+      '<li><span class="stat-num">' + TRACKS.length + '</span> <span class="stat-label">cara belajar</span></li>' +
       '<li><span class="stat-num">' + moduleCount + '</span> <span class="stat-label">modul</span></li>' +
-      '<li><span class="stat-num">' + QUIZ_LESSONS.length + '</span> <span class="stat-label">kuiz</span></li>' +
       '<li><span class="stat-num">' + QUIZ.passMark + '%</span> <span class="stat-label">markah lulus</span></li>' +
       '<li><span class="stat-num stat-icon">' + icon('award') + '</span> <span class="stat-label">sijil percuma</span></li>' +
       '</ul></div>' +
@@ -520,16 +669,50 @@
       resumeCard +
       '<section class="section modules-section" aria-labelledby="kandungan-heading"><div class="container">' +
       '<div class="section-head"><h2 id="kandungan-heading">Kandungan Kursus</h2><span class="dots" aria-hidden="true"></span></div>' +
-      '<ol class="module-grid">' + modules + '</ol></div></section></main>' + siteFooter());
+      contentTabs() + '</div></section></main>' + siteFooter());
     var reset = document.getElementById('reset-btn');
     if (reset) reset.addEventListener('click', signOut);
+    bindTabs();
     justSignedOut = false;
+  }
+
+  // ---- Pilih Cara Belajar (views/pilih.php) ----
+  function renderChoose() {
+    var cards = TRACKS.map(function (T) {
+      var info = trackInfo(T);
+      var pct = percentDone(T, doneSet(passedSet(T)));
+      return '<li class="track-card track-' + T.key + '" data-track="' + T.key + '">' +
+        '<div class="track-head"><span class="track-icon" aria-hidden="true">' + icon(info.icon) + '</span>' +
+        '<div><p class="track-tagline">' + e(info.tagline) + '</p><h2 class="track-title">' + e(T.title) + '</h2></div></div>' +
+        '<p class="track-text">' + e(info.text) + '</p><ul class="chip-list">' +
+        info.facts.map(function (f) { return '<li class="chip">' + e(f) + '</li>'; }).join('') + '</ul>' +
+        '<div class="progress' + (pct >= 100 ? ' is-complete' : '') + '"><div class="progress-text">' + pct + '% selesai</div>' +
+        '<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"' +
+        ' aria-label="Kemajuan ' + e(T.title) + '"><span style="width: ' + pct + '%"></span></div></div>' +
+        '<a class="btn btn-primary btn-lg btn-block track-cta" href="#/kursus?track=' + T.key + '">' +
+        (pct > 0 ? 'Teruskan' : 'Mula') + ' ' + e(info.cta) + ' ' + icon('arrow') + '</a></li>';
+    }).join('');
+    setPage('Pilih Cara Belajar', siteHeader() +
+      '<main class="choose-page"><section class="choose-hero">' +
+      '<img class="blob blob-tr" src="assets/img/blob-orange.svg" alt="" aria-hidden="true" width="487" height="354">' +
+      '<div class="container choose-hero-inner"><div class="choose-copy"><p class="eyebrow">Langkah seterusnya</p>' +
+      '<h1>Pilih cara belajar anda</h1><p class="lead">Hai ' + e(fullName()) + '! Kedua-dua cara menggunakan ' +
+      'soalan kuiz yang sama dan memberi sijil yang sama. Selesaikan salah satu untuk mendapatkan sijil anda.</p></div>' +
+      '<img class="choose-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294"></div></section>' +
+      '<div class="container choose-body">' +
+      (state.completion ? '<div class="alert alert-success">Kursus ini telah selesai. <a href="#/sijil">Lihat sijil anda</a>. ' +
+        'Anda masih boleh membuka kedua-dua cara belajar.</div>' : '') +
+      '<ul class="track-grid">' + cards + '</ul>' +
+      '<div class="choose-foot"><p class="muted small">' + icon('info') + 'Anda boleh menukar cara belajar bila-bila masa. ' +
+      'Kemajuan setiap cara disimpan.</p>' +
+      '<button type="button" class="btn btn-outline" id="signout-btn">Selesai / Keluar</button></div>' +
+      '</div></main>' + siteFooter());
+    document.getElementById('signout-btn').addEventListener('click', signOut);
   }
 
   // ---- Registration ----
   var FIELDS = [
-    ['first_name', 'Nama Pertama', 'text', 'maxlength="100" autocomplete="given-name"'],
-    ['last_name', 'Nama Akhir', 'text', 'maxlength="100" autocomplete="family-name"'],
+    ['full_name', 'Nama Penuh', 'text', 'maxlength="150" autocomplete="name" autocapitalize="words"'],
     ['age', 'Umur', 'number', 'min="5" max="120" step="1" inputmode="numeric"'],
     ['phone', 'Nombor Telefon', 'tel', 'maxlength="20" autocomplete="tel"'],
     ['email', 'E-mel', 'email', 'maxlength="190" autocomplete="email"'],
@@ -537,7 +720,9 @@
     ['occupation', 'Pekerjaan', 'text', 'maxlength="100" autocomplete="organization-title"']
   ];
   // Fields that share a row on wider screens (pairs are adjacent above, as in views/register.php).
-  var HALF_FIELDS = { first_name: true, last_name: true, age: true, phone: true };
+  var HALF_FIELDS = { age: true, phone: true };
+  var FIELD_HELP = { full_name: 'Tulis nama penuh seperti dalam kad pengenalan. Nama ini dicetak pada sijil dan boleh digunakan untuk Sambung Semula.' };
+  var FULL_NAME_MAX = 150; // src/validation.php
 
   // Navy brand panel beside the form (views/auth-brand.php). The draft cannot resume by e-mail,
   // so its second point says what it does instead.
@@ -555,11 +740,11 @@
   function validateRegistration(input) {
     var c = {};
     FIELDS.forEach(function (f) { c[f[0]] = String(input[f[0]] || '').trim(); });
+    c.full_name = normalizeName(c.full_name);
     var err = {};
-    if (c.first_name === '') err.first_name = 'Sila masukkan nama pertama.';
-    else if (c.first_name.length > 100) err.first_name = 'Nama pertama tidak boleh melebihi 100 aksara.';
-    if (c.last_name === '') err.last_name = 'Sila masukkan nama akhir.';
-    else if (c.last_name.length > 100) err.last_name = 'Nama akhir tidak boleh melebihi 100 aksara.';
+    if (c.full_name === '') err.full_name = 'Sila masukkan nama penuh.';
+    else if (c.full_name.length > FULL_NAME_MAX) err.full_name = 'Nama penuh tidak boleh melebihi ' + FULL_NAME_MAX + ' aksara.';
+    else if (!/\p{L}/u.test(c.full_name)) err.full_name = 'Nama penuh mesti mengandungi huruf.';
     if (c.age === '') err.age = 'Sila masukkan umur.';
     else if (!/^[0-9]{1,3}$/.test(c.age) || +c.age < 5 || +c.age > 120) err.age = 'Umur mestilah nombor antara 5 hingga 120.';
     if (c.email === '') err.email = 'Sila masukkan alamat e-mel.';
@@ -581,7 +766,9 @@
       var name = f[0];
       return '<div class="field' + (HALF_FIELDS[name] ? ' field-half' : '') + (errors[name] ? ' has-error' : '') + '">' +
         '<label for="f-' + name + '">' + e(f[1]) + ' <span class="req">*</span></label>' +
-        '<input id="f-' + name + '" name="' + name + '" type="' + f[2] + '" value="' + e(old[name]) + '" required ' + f[3] + '>' +
+        '<input id="f-' + name + '" name="' + name + '" type="' + f[2] + '" value="' + e(old[name]) + '" required ' + f[3] +
+        (FIELD_HELP[name] ? ' aria-describedby="h-' + name + '"' : '') + '>' +
+        (FIELD_HELP[name] ? '<p class="muted small field-note" id="h-' + name + '">' + e(FIELD_HELP[name]) + '</p>' : '') +
         (errors[name] ? '<p class="field-error">' + icon('alert') + e(errors[name]) + '</p>' : '') +
         '</div>';
     }).join('');
@@ -620,7 +807,7 @@
       state.remember = remember;
       state.rememberUntil = remember ? Date.now() + REMEMBER_MS : 0;
       save();
-      go('#/kursus');
+      go('#/pilih');
     });
   }
 
@@ -637,11 +824,17 @@
         '<p><a class="btn btn-primary btn-lg" href="#/kursus">' + icon('back') + 'Kembali ke kursus</a></p></div></main>' + siteFooter());
       return;
     }
-    var passed = passedSet();
+    // The track: the one that owns ?lesson=, else ?track=, else the one last opened (public/course.php).
+    var T = lesson ? trackOf(lesson) : (trackByKey(params.track) || currentTrack());
+    if (state.track !== T.key) {
+      state.track = T.key;
+      save();
+    }
+    var passed = passedSet(T);
     var done = doneSet(passed);
     if (!lesson) {
-      for (var i = 0; i < LESSONS.length && !lesson; i++) if (!done[LESSONS[i].key]) lesson = LESSONS[i];
-      if (!lesson) lesson = LESSONS[0];
+      for (var i = 0; i < T.lessons.length && !lesson; i++) if (!done[T.lessons[i].key]) lesson = T.lessons[i];
+      if (!lesson) lesson = T.lessons[0];
     }
     var slideCount = lesson.type === 'presentation' ? lesson.slides.length : 0;
     var slide = 1;
@@ -649,25 +842,30 @@
       var req = parseInt(params.slide, 10);
       slide = Math.max(1, Math.min(slideCount, isNaN(req) ? 1 : req));
     }
-    var doneCount = LESSONS.filter(function (l) { return done[l.key]; }).length;
-    var percent = Math.round(doneCount * 100 / LESSONS.length);
+    var percent = percentDone(T, done);
 
-    var sidebar = COURSE.sections.map(function (s) {
-      var sLessons = sectionLessons(s.key);
+    var trackSwitch = '<nav class="track-switch" aria-label="Cara belajar">' + TRACKS.map(function (t) {
+      var on = t.key === T.key;
+      return '<a class="track-switch-btn' + (on ? ' is-active' : '') + '" href="#/kursus?track=' + t.key + '"' +
+        (on ? ' aria-current="true"' : '') + '>' + icon(t.key === 'self-learning' ? 'video' : 'slides') + e(t.title) + '</a>';
+    }).join('') + '</nav>';
+
+    var sidebar = T.sections.map(function (s) {
+      var sLessons = sectionLessons(T, s.key);
       var sDone = sLessons.filter(function (l) { return done[l.key]; }).length;
-      var sLocked = sLessons.length > 0 && lockReason(sLessons[0], done, passed) !== null;
+      var sLocked = sLessons.length > 0 && lockReason(T, sLessons[0], done, passed) !== null;
       var sComplete = sLessons.length > 0 && sDone === sLessons.length;
       var rows = sLessons.map(function (l) {
         var isDone = !!done[l.key];
         var isCurrent = l.key === lesson.key;
-        var isLocked = lockReason(l, done, passed) !== null;
+        var isLocked = lockReason(T, l, done, passed) !== null;
         var isPassed = l.type === 'quiz' && !!passed[l.key];
         return '<li class="lesson-row' + (isCurrent ? ' is-current' : '') + (isDone ? ' is-done' : '') + (isLocked ? ' is-locked' : '') +
           '" data-title="' + e(l.title) + '">' +
           '<a href="' + courseHref(l.key) + '"' + (isCurrent ? ' aria-current="page"' : '') + '>' +
           '<span class="lesson-tick" aria-hidden="true">' + (isDone ? icon('check') : (isLocked ? icon('lock') : '')) + '</span>' +
           '<span class="lesson-meta"><span class="lesson-title">' + e(l.title) + '</span>' +
-          '<span class="lesson-tags"><span class="lesson-label">' + icon(l.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(l)) + '</span>' +
+          '<span class="lesson-tags"><span class="lesson-label">' + icon(lessonIcon(l)) + e(lessonLabel(l)) + '</span>' +
           (l.type === 'quiz' ? '<span class="lesson-status' + (isPassed ? ' is-pass' : '') + '">' + (isPassed ? 'LULUS' : 'BELUM LULUS') + '</span>' : '') +
           '</span></span>' +
           (isDone ? '<span class="sr-only">(selesai)</span>' : '') +
@@ -682,9 +880,10 @@
         '<ul class="lesson-list">' + rows + '</ul></details>';
     }).join('');
 
-    var lock = lockReason(lesson, done, passed);
+    var lock = lockReason(T, lesson, done, passed);
     var main = lock ? lockHtml(lesson, lock)
-      : (lesson.type === 'presentation' ? presentationHtml(lesson, slide, slideCount) : quizHtml(lesson, params, passed));
+      : (lesson.type === 'presentation' ? presentationHtml(lesson, slide, slideCount)
+        : (lesson.type === 'video' ? videoHtml(lesson, !!done[lesson.key]) : quizHtml(T, lesson, params, passed)));
 
     document.body.className = 'course-page';
     setPage(lesson.title,
@@ -697,7 +896,7 @@
       '<span class="topbar-user">' + e(fullName()) + '</span>' +
       '<button type="button" class="btn btn-outline btn-sm" id="topbar-signout-btn">Selesai / Keluar</button></div></header>' +
       '<div class="course-layout"><aside class="sidebar" id="course-sidebar" aria-label="Kandungan kursus">' +
-      '<h2 class="sidebar-title">' + e(COURSE.title) + '</h2>' +
+      '<h2 class="sidebar-title">' + e(COURSE.title) + '</h2>' + trackSwitch +
       '<div class="progress' + (percent >= 100 ? ' is-complete' : '') + '"><div class="progress-text">' + percent + '% selesai</div>' +
       '<div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + percent + '">' +
       '<span style="width: ' + percent + '%"></span></div></div>' +
@@ -712,17 +911,19 @@
     bindDrawer();
     if (lock) return;
     if (lesson.type === 'presentation') bindViewer(lesson, slide, slideCount);
-    else bindQuiz(lesson);
+    else if (lesson.type === 'video') bindVideo(lesson, !!done[lesson.key]);
+    else bindQuiz(T, lesson);
   }
 
   // A locked lesson (the portal answers 403 with this card).
   // Lesson title with its section title as eyebrow (views/course.php .lesson-heading).
   function lessonHeading(lesson) {
-    return '<div class="lesson-heading"><p class="lesson-eyebrow">' + e(COURSE.sections[sectionIndex(lesson.sectionKey)].title) + '</p>' +
+    var T = trackOf(lesson);
+    return '<div class="lesson-heading"><p class="lesson-eyebrow">' + e(T.sections[sectionIndex(T, lesson.sectionKey)].title) + '</p>' +
       '<h1>' + e(lesson.title) + '</h1></div>';
   }
   function lessonLabelHtml(lesson) {
-    return '<span class="lesson-label">' + icon(lesson.type === 'quiz' ? 'quiz' : 'slides') + e(lessonLabel(lesson)) + '</span>';
+    return '<span class="lesson-label">' + icon(lessonIcon(lesson)) + e(lessonLabel(lesson)) + '</span>';
   }
 
   function lockHtml(lesson, lock) {
@@ -814,6 +1015,215 @@
     show(startSlide);
   }
 
+  // ---- Video lesson (Self-Learning), same markup as views/course.php ----
+  function videoHtml(lesson, videoDone) {
+    return '<div class="lesson-header">' + lessonHeading(lesson) + lessonLabelHtml(lesson) + '</div>' +
+      '<div class="video-lesson" id="video-lesson" data-youtube="' + e(lesson.youtube) + '" data-duration="' + lesson.duration + '"' +
+      ' data-done="' + (videoDone ? '1' : '0') + '">' +
+      '<div class="video-frame"><div class="video-player" id="video-player"></div>' +
+      '<button type="button" class="video-facade" id="video-play">' +
+      '<img class="video-facade-blob" src="assets/img/blob-orange.svg" alt="" width="487" height="354">' +
+      '<img class="video-facade-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294">' +
+      '<span class="video-facade-title">' + e(lesson.title) + '</span>' +
+      '<span class="video-facade-play" aria-hidden="true">' + icon('play') + '</span>' +
+      '<span class="video-facade-cta">Main video</span>' +
+      '<span class="video-facade-time">' + formatDuration(lesson.duration) + '</span></button></div>' +
+      '<div class="video-bar"><div class="video-watch"><p class="video-watch-text" id="video-watch-text" aria-live="polite">' +
+      (videoDone ? 'Video ini telah ditonton sampai habis.' : 'Ditonton 0:00 / ' + formatDuration(lesson.duration)) + '</p>' +
+      '<div class="progress-bar" aria-hidden="true"><span id="video-watch-bar" style="width: ' + (videoDone ? 100 : 0) + '%"></span></div></div>' +
+      '<form class="complete-form" id="complete-form">' +
+      '<button type="submit" class="btn btn-primary" id="complete-btn"' + (videoDone ? '' : ' disabled') + '>LENGKAP &amp; TERUSKAN</button>' +
+      '<span class="complete-hint">Tonton video sampai habis untuk teruskan</span></form></div></div>' +
+      '<p class="muted small video-note">' + icon('info') + 'Video tidak boleh dilangkau ke hadapan pada tontonan pertama. ' +
+      'Anda boleh menukar kelajuan sehingga 2x melalui tetapan video.</p>';
+  }
+
+  function bindVideo(lesson, videoDone) {
+    var root = document.getElementById('video-lesson');
+    var watched = videoDone;
+    activeVideo = videoLesson({
+      root: root,
+      youtube: lesson.youtube,
+      duration: lesson.duration,
+      done: videoDone,
+      // The furthest point watched is kept in the draft state, so "Selesai / Keluar" forgets it.
+      progress: {
+        get: function () { return (state.videoPos && state.videoPos[lesson.key]) || 0; },
+        set: function (v) { if (state.learner) { state.videoPos[lesson.key] = v; save(); } },
+        clear: function () { if (state.learner) { delete state.videoPos[lesson.key]; save(); } }
+      },
+      onActivity: touch,
+      onWatched: function () { watched = true; }
+    });
+    document.getElementById('complete-form').addEventListener('submit', function (ev) {
+      ev.preventDefault();
+      if (!watched) return;
+      if (currentLock(lesson)) return go(courseHref(lesson.key));
+      state.done[lesson.key] = true;
+      save();
+      var next = nextLesson(lesson.key);
+      go(courseHref(next ? next.key : lesson.key));
+    });
+  }
+
+  // Video player: a copy of videoLesson() in public/assets/js/course.js (keep both in sync). The draft has no
+  // server, so here the player alone decides when the video was watched to the end.
+  function videoLesson(o) {
+    var MAX_SPEED = 2;
+    var SKIP_TOLERANCE = 2.5; // seconds ahead of the furthest point that still count as normal playback
+    var root = o.root;
+    var facade = root.querySelector('#video-play');
+    var host = root.querySelector('#video-player');
+    var text = root.querySelector('#video-watch-text');
+    var bar = root.querySelector('#video-watch-bar');
+    var completeBtn = root.querySelector('#complete-btn');
+    var done = !!o.done;
+    var duration = o.duration;
+    var maxWatched = done ? 0 : o.progress.get();
+    var player = null;
+    var timer = null;
+    var lastSaved = 0;
+    var noteUntil = 0;
+
+    function fmt(sec) {
+      sec = Math.max(0, Math.floor(sec));
+      var h = Math.floor(sec / 3600);
+      var m = Math.floor((sec % 3600) / 60);
+      var s = sec % 60;
+      return (h > 0 ? h + ':' + (m < 10 ? '0' : '') + m : String(m)) + ':' + (s < 10 ? '0' : '') + s;
+    }
+    function setText(msg) { if (text) text.textContent = msg; }
+    function showProgress() {
+      if (done) return;
+      if (bar) bar.style.width = (duration > 0 ? Math.min(100, maxWatched * 100 / duration) : 0) + '%';
+      if (Date.now() >= noteUntil) setText('Ditonton ' + fmt(maxWatched) + ' / ' + fmt(duration));
+    }
+    function note(msg) {
+      noteUntil = Date.now() + 4000;
+      setText(msg);
+    }
+    function save(force) {
+      if (done || (!force && Date.now() - lastSaved < 5000)) return;
+      lastSaved = Date.now();
+      o.progress.set(Math.floor(maxWatched));
+    }
+    function finish() {
+      done = true;
+      stopTimer();
+      o.progress.clear();
+      if (bar) bar.style.width = '100%';
+      setText('Video selesai ditonton. Tekan LENGKAP & TERUSKAN untuk ke kuiz.');
+      if (completeBtn) completeBtn.disabled = false;
+      root.classList.add('is-watched');
+      if (o.onWatched) o.onWatched();
+    }
+    function tick() {
+      if (!player || typeof player.getCurrentTime !== 'function') return;
+      var d = player.getDuration ? player.getDuration() : 0;
+      if (d > 0) duration = d;
+      var t = player.getCurrentTime();
+      if (!done && t > maxWatched + SKIP_TOLERANCE) {
+        player.seekTo(maxWatched, true);
+        note('Video tidak boleh dilangkau ke hadapan. Sila tonton sampai habis.');
+      } else if (t > maxWatched) {
+        maxWatched = t;
+      }
+      showProgress();
+      save(false);
+      if (o.onActivity) o.onActivity();
+    }
+    function startTimer() { if (!timer) timer = setInterval(tick, 500); }
+    function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
+
+    function onState(ev) {
+      var YTS = window.YT && window.YT.PlayerState ? window.YT.PlayerState : { ENDED: 0, PLAYING: 1 };
+      if (ev.data === YTS.PLAYING) {
+        startTimer();
+      } else if (ev.data === YTS.ENDED) {
+        tick();
+        if (done || maxWatched >= duration - 3) {
+          finish();
+        } else {
+          stopTimer();
+          player.seekTo(maxWatched, true);
+          note('Video tidak boleh dilangkau ke hadapan. Sila tonton sampai habis.');
+        }
+      } else {
+        tick();
+        stopTimer();
+        save(true);
+      }
+    }
+    function onRate(ev) {
+      if (ev.data > MAX_SPEED && player.setPlaybackRate) {
+        player.setPlaybackRate(MAX_SPEED);
+        note('Kelajuan maksimum ialah ' + MAX_SPEED + 'x.');
+      }
+    }
+    function fail() {
+      root.classList.remove('is-loading');
+      facade.disabled = false;
+      note('Video tidak dapat dimuatkan. Semak sambungan internet anda dan cuba lagi.');
+    }
+
+    facade.addEventListener('click', function () {
+      if (player) return;
+      root.classList.add('is-loading');
+      facade.disabled = true;
+      loadYouTubeApi().then(function (YT) {
+        player = new YT.Player(host, {
+          host: 'https://www.youtube-nocookie.com',
+          videoId: o.youtube,
+          width: '100%',
+          height: '100%',
+          playerVars: { autoplay: 1, rel: 0, playsinline: 1, modestbranding: 1, start: done ? 0 : Math.floor(maxWatched) },
+          events: {
+            onReady: function () {
+              root.classList.remove('is-loading');
+              root.classList.add('is-playing');
+              facade.hidden = true;
+              if (player.playVideo) player.playVideo();
+            },
+            onStateChange: onState,
+            onPlaybackRateChange: onRate,
+            onError: function () { note('Video tidak dapat dimainkan. Sila cuba lagi sebentar lagi.'); }
+          }
+        });
+      }).catch(fail);
+    });
+    showProgress();
+    return {
+      destroy: function () {
+        save(true);
+        stopTimer();
+        if (player && player.destroy) player.destroy();
+        player = null;
+      }
+    };
+  }
+
+  // Loads the YouTube IFrame API once (only after the first click on a video).
+  var youTubeApi = null;
+  function loadYouTubeApi() {
+    if (window.YT && window.YT.Player) return Promise.resolve(window.YT);
+    if (youTubeApi) return youTubeApi;
+    youTubeApi = new Promise(function (resolve, reject) {
+      var prev = window.onYouTubeIframeAPIReady;
+      var timeout = setTimeout(function () { youTubeApi = null; reject(new Error('timeout')); }, 15000);
+      window.onYouTubeIframeAPIReady = function () {
+        clearTimeout(timeout);
+        if (typeof prev === 'function') prev();
+        resolve(window.YT);
+      };
+      var s = document.createElement('script');
+      s.src = 'https://www.youtube.com/iframe_api';
+      s.async = true;
+      s.onerror = function () { clearTimeout(timeout); youTubeApi = null; reject(new Error('load')); };
+      document.head.appendChild(s);
+    });
+    return youTubeApi;
+  }
+
   document.addEventListener('keydown', function (ev) {
     if (!viewerCtl) return;
     var tag = (ev.target && ev.target.tagName) || '';
@@ -886,7 +1296,7 @@
   // ---- Module quizzes ----
   function formatPercent(p) { return String(Math.round(p * 100) / 100); }
 
-  function quizHtml(lesson, params, passed) {
+  function quizHtml(T, lesson, params, passed) {
     var quiz = quizOf(lesson);
     var html = '<div class="lesson-header">' + lessonHeading(lesson) + lessonLabelHtml(lesson) + '</div>';
     var mine = state.attempts.filter(function (a) { return a.quiz === lesson.key; });
@@ -899,7 +1309,7 @@
       attempt = mine.filter(function (a) { return a.id === id; })[0] || null;
     }
     if (attempt) {
-      var allPassedNow = allQuizzesPassed(passed);
+      var allPassedNow = allQuizzesPassed(T, passed);
       var isFinal = attempt.passed && !state.completion && allPassedNow;
       var pct = formatPercent(attempt.percent);
       html += '<div class="card quiz-result ' + (attempt.passed ? 'is-pass' : 'is-fail') + (isFinal ? ' is-final' : '') + '">' +
@@ -938,7 +1348,7 @@
       qs + '<button type="submit" class="btn btn-primary btn-lg quiz-submit">Hantar Jawapan ' + icon('arrow') + '</button></form>';
   }
 
-  function bindQuiz(lesson) {
+  function bindQuiz(T, lesson) {
     var form = document.getElementById('quiz-form');
     if (form) {
       form.addEventListener('submit', function (ev) {
@@ -964,7 +1374,7 @@
     if (finish) {
       finish.addEventListener('submit', function (ev) {
         ev.preventDefault();
-        var first = firstUnpassedQuiz(passedSet());
+        var first = firstUnpassedQuiz(T, passedSet(T));
         if (first) return go(courseHref(first.key));
         if (!state.completion) state.completion = { code: randomCode(), completedAt: todayIso() };
         save();
@@ -996,15 +1406,14 @@
       'tidak dipaparkan kepada pengguna seterusnya pada peranti ini. Di komputer awam, simpan fail sijil ' +
       'ke telefon atau e-mel anda dan padamkan salinan daripada komputer tersebut.</p>' +
       '<p class="muted small">' + icon('shield') + 'Ini sijil contoh daripada draf pratonton. Pengesahan sijil hanya tersedia dalam portal sebenar.</p>' +
-      '<p><a class="back-link" href="' + courseHref(LAST_QUIZ.key) + '">' + icon('back') + 'Kembali ke kursus</a></p>' +
+      '<p><a class="back-link" href="#/kursus">' + icon('back') + 'Kembali ke kursus</a></p>' +
       '</div></div></main>' + siteFooter());
     document.getElementById('signout-btn').addEventListener('click', signOut);
     document.getElementById('download-btn').addEventListener('click', function () {
       if (expireIfIdle() || !state.completion) return go('#/daftar');
       save();
       var data = {
-        first_name: state.learner.first_name,
-        last_name: state.learner.last_name,
+        name: fullName(),
         course_title: COURSE.title,
         date_text: formatDateMs(c.completedAt),
         code: c.code,
@@ -1100,7 +1509,7 @@
       var layout = nameLayout(function (t, sizePt) {
         font('bold', sizePt);
         return g.measureText(t).width / S;
-      }, d.first_name + ' ' + d.last_name, n);
+      }, d.name, n);
       var lineH = layout.size * 0.3528 * 1.15;
       var top = n.center_y - layout.lines.length * lineH / 2;
       layout.lines.forEach(function (line, i) {
@@ -1163,7 +1572,7 @@
     push(jpeg);
     push('\nendstream\nendobj\n');
     obj(6, '<< /Title ' + utf16Hex('Sijil ' + d.code) + ' /Author ' + utf16Hex(d.issuer) +
-      ' /Subject ' + utf16Hex(d.first_name + ' ' + d.last_name + ' - ' + d.course_title + ' - ' + d.date_text) +
+      ' /Subject ' + utf16Hex(d.name + ' - ' + d.course_title + ' - ' + d.date_text) +
       ' /Creator ' + utf16Hex('NADI LMS (draf)') + ' >>');
     var xref = length;
     var x = 'xref\n0 7\n0000000000 65535 f \n';

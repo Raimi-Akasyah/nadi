@@ -71,7 +71,7 @@ function certificate_name_layout(callable $measure, string $name, array $cfg): a
  * placeholder is covered, and the name, date and certificate number are printed.
  * Template and positions come from content/certificate.php.
  *
- * @param array $d first_name, last_name, course_title, date_text, code, issuer
+ * @param array $d name (the learner's full name), course_title, date_text, code, issuer
  */
 function render_certificate_pdf(array $d): string
 {
@@ -95,7 +95,7 @@ function render_certificate_pdf(array $d): string
         $pdf->SetFont('Helvetica', 'B', $size);
         return $pdf->GetStringWidth(pdf_text($text));
     };
-    $layout = certificate_name_layout($measure, $d['first_name'] . ' ' . $d['last_name'], $n);
+    $layout = certificate_name_layout($measure, (string)$d['name'], $n);
     $lineH = $layout['size'] * 0.3528 * 1.15;
     $top = $n['center_y'] - count($layout['lines']) * $lineH / 2;
     $pdf->SetTextColor(...$n['color']);

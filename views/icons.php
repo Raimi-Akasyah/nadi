@@ -28,6 +28,8 @@ if (!function_exists('icon')) {
             'shield'   => '<path d="M12 3 4.5 6v5.5c0 4.6 3.2 8 7.5 9.5 4.3-1.5 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
             'slides'   => '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8"/><path d="m10.5 8 4 2-4 2z"/>',
             'user'     => '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M19 8v6M16 11h6"/>',
+            'video'    => '<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/>',
+            'play'     => '<path d="M8 5.5v13l10.5-6.5z"/>',
         ];
         $cls = 'icon' . ($class !== '' ? ' ' . $class : '');
         return '<svg class="' . $cls . '" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"'

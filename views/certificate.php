@@ -25,7 +25,7 @@ $verifyUrl = 'verify.php?' . http_build_query(['code' => $completion['certificat
                 <p class="ticket-kicker"><?= icon('award') ?>Sijil Penyelesaian</p>
                 <dl class="certificate-details">
                     <dt>Nama</dt>
-                    <dd><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></dd>
+                    <dd><?= e(learner_name($learner)) ?></dd>
                     <dt>Kursus</dt>
                     <dd><?= e($course->title()) ?></dd>
                     <dt>Tarikh</dt>

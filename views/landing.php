@@ -1,8 +1,10 @@
 <?php
 /** @var Course $course */
+/** @var Course[] $tracks */
 /** @var array|null $learner */
 /** @var bool $signedOut */
 require_once __DIR__ . '/icons.php';
+require_once __DIR__ . '/tracks.php';
 
 $moduleCount = 0;
 foreach ($course->sections() as $section) {
@@ -10,14 +12,11 @@ foreach ($course->sections() as $section) {
         $moduleCount++;
     }
 }
-$quizCount = count($course->quizLessons());
-$initials = $learner !== null
-    ? mb_strtoupper(mb_substr(trim($learner['first_name']), 0, 1) . mb_substr(trim($learner['last_name']), 0, 1))
-    : '';
+$initials = $learner !== null ? name_initials(learner_name($learner)) : '';
 $steps = [
     ['user', 'Daftar', 'Isi maklumat asas anda. Tiada akaun atau kata laluan.'],
-    ['book', 'Belajar', 'Ikuti slaid setiap modul mengikut kadar anda sendiri, di telefon atau komputer.'],
-    ['clipboard', 'Kuiz', 'Lulus kuiz modul untuk membuka modul yang seterusnya.'],
+    ['book', 'Pilih & belajar', 'Pilih E-Learning (slaid) atau Self-Learning (video), di telefon atau komputer.'],
+    ['clipboard', 'Kuiz', 'Lulus kuiz dengan markah sekurang-kurangnya ' . $course->passMark() . '%. Cubaan tanpa had.'],
     ['award', 'Sijil', 'Muat turun sijil penyelesaian (PDF) dengan nama anda.'],
 ];
 ?>
@@ -31,15 +30,16 @@ $steps = [
                 <h1><?= e($course->title()) ?></h1>
                 <span class="dots" aria-hidden="true"></span>
                 <p class="lead">Pelajari asas kecerdasan buatan (AI) secara percuma mengikut kadar anda sendiri.
-                    Lengkapkan kelima-lima modul dan lulus kuiz di hujung setiap modul dengan markah sekurang-kurangnya
-                    <?= e($course->passMark()) ?>% untuk muat turun sijil penyelesaian anda.</p>
+                    Pilih E-Learning (slaid lima modul, lulus kuiz di hujung setiap modul) atau Self-Learning (tonton video,
+                    kemudian satu kuiz). Dapatkan markah sekurang-kurangnya <?= e($course->passMark()) ?>% untuk muat turun
+                    sijil penyelesaian anda.</p>
                 <?php if ($learner !== null): ?>
                     <div class="greeting-card">
                         <span class="avatar" aria-hidden="true"><?= e($initials) ?></span>
-                        <p>Selamat kembali, <strong><?= e($learner['first_name'] . ' ' . $learner['last_name']) ?></strong>.</p>
+                        <p>Selamat kembali, <strong><?= e(learner_name($learner)) ?></strong>.</p>
                     </div>
                     <div class="hero-actions">
-                        <a class="btn btn-primary btn-lg" href="course.php">Teruskan Kursus <?= icon('arrow') ?></a>
+                        <a class="btn btn-primary btn-lg" href="pilih.php">Teruskan Kursus <?= icon('arrow') ?></a>
                         <form method="post" action="reset.php" class="inline-form">
                             <?= csrf_field() ?>
                             <button type="submit" class="btn-link">Bukan anda? Mula semula</button>
@@ -53,11 +53,11 @@ $steps = [
                         <a class="btn btn-primary btn-lg" href="register.php">Daftar Sekarang <?= icon('arrow') ?></a>
                     </div>
                     <p class="hero-note">Tiada akaun atau kata laluan diperlukan. Hanya isi maklumat asas anda.
-                        Sudah mendaftar? <a class="hero-link" href="#sambung-semula">Sambung Semula</a> dengan e-mel anda.</p>
+                        Sudah mendaftar? <a class="hero-link" href="#sambung-semula">Sambung Semula</a> dengan nama penuh atau e-mel anda.</p>
                 <?php endif; ?>
                 <ul class="stat-strip">
+                    <li><span class="stat-num"><?= e(count($tracks)) ?></span> <span class="stat-label">cara belajar</span></li>
                     <li><span class="stat-num"><?= e($moduleCount) ?></span> <span class="stat-label">modul</span></li>
-                    <li><span class="stat-num"><?= e($quizCount) ?></span> <span class="stat-label">kuiz</span></li>
                     <li><span class="stat-num"><?= e($course->passMark()) ?>%</span> <span class="stat-label">markah lulus</span></li>
                     <li><span class="stat-num stat-icon"><?= icon('award') ?></span> <span class="stat-label">sijil percuma</span></li>
                 </ul>
@@ -100,8 +100,8 @@ $steps = [
                     <div class="resume-copy">
                         <span class="resume-icon"><?= icon('refresh') ?></span>
                         <h2>Sambung Semula</h2>
-                        <p class="muted">Sudah mendaftar sebelum ini, di peranti ini atau peranti lain? Masukkan e-mel anda
-                            untuk menyambung kemajuan, kuiz dan sijil anda. Tiada kata laluan diperlukan.</p>
+                        <p class="muted">Sudah mendaftar sebelum ini, di peranti ini atau peranti lain? Masukkan nama penuh
+                            atau e-mel anda untuk menyambung kemajuan, kuiz dan sijil anda. Tiada kata laluan diperlukan.</p>
                     </div>
                     <div class="resume-body">
                         <?php require __DIR__ . '/resume-form.php'; ?>
@@ -117,32 +117,55 @@ $steps = [
                 <h2 id="kandungan-heading">Kandungan Kursus</h2>
                 <span class="dots" aria-hidden="true"></span>
             </div>
-            <ol class="module-grid">
-                <?php foreach ($course->sections() as $section):
-                    $isModule = strncmp($section['key'], 'modul-', 6) === 0;
-                    $isIntro = $section['key'] === 'pengenalan';
+            <?php // Tabs (assets/js/tabs.js). Without JavaScript the buttons stay hidden and both panels show. ?>
+            <div class="track-tabs" role="tablist" aria-label="Cara belajar" data-tabs>
+                <?php foreach ($tracks as $i => $t):
+                    $info = track_info($t);
                 ?>
-                    <li class="module-card<?= $isModule ? '' : ($isIntro ? ' is-intro' : ' is-outro') ?>">
-                        <span class="module-badge" aria-hidden="true"><?php
-                            if ($isModule) {
-                                echo e(substr($section['key'], 6));
-                            } elseif ($isIntro) {
-                                echo 'Mula';
-                            } else {
-                                echo icon('flag');
-                            }
-                        ?></span>
-                        <div class="module-body">
-                            <h3 class="module-title"><?= e($section['title']) ?></h3>
-                            <ul class="chip-list">
-                                <?php foreach ($section['lessons'] as $lesson): ?>
-                                    <li class="chip<?= $lesson['type'] === 'quiz' ? ' chip-quiz' : '' ?>"><?= icon($lesson['type'] === 'quiz' ? 'quiz' : 'slides') ?><?= e($course->lessonLabel($lesson)) ?></li>
-                                <?php endforeach; ?>
-                            </ul>
-                        </div>
-                    </li>
+                    <button type="button" class="track-tab" role="tab" id="tab-<?= e($t->track()) ?>"
+                            aria-controls="panel-<?= e($t->track()) ?>" aria-selected="<?= $i === 0 ? 'true' : 'false' ?>"<?= $i === 0 ? '' : ' tabindex="-1"' ?>>
+                        <span class="track-tab-icon" aria-hidden="true"><?= icon($info['icon']) ?></span>
+                        <span class="track-tab-text"><span class="track-tab-title"><?= e($t->trackTitle()) ?></span>
+                            <span class="track-tab-sub"><?= e($info['tagline']) ?></span></span>
+                    </button>
                 <?php endforeach; ?>
-            </ol>
+            </div>
+            <?php foreach ($tracks as $t):
+                $info = track_info($t);
+            ?>
+                <div class="track-panel" role="tabpanel" id="panel-<?= e($t->track()) ?>" aria-labelledby="tab-<?= e($t->track()) ?>" tabindex="0">
+                    <div class="track-panel-head">
+                        <h3 class="track-panel-title"><?= e($t->trackTitle()) ?>: <?= e($info['tagline']) ?></h3>
+                        <p class="muted"><?= e($info['text']) ?></p>
+                    </div>
+                    <ol class="module-grid">
+                        <?php foreach ($t->sections() as $section):
+                            $isModule = strncmp($section['key'], 'modul-', 6) === 0;
+                            $isIntro = $section['key'] === 'pengenalan';
+                        ?>
+                            <li class="module-card<?= $isModule ? '' : ($isIntro ? ' is-intro' : ' is-outro') ?>">
+                                <span class="module-badge" aria-hidden="true"><?php
+                                    if ($isModule) {
+                                        echo e(substr($section['key'], 6));
+                                    } elseif ($isIntro) {
+                                        echo 'Mula';
+                                    } else {
+                                        echo icon('flag');
+                                    }
+                                ?></span>
+                                <div class="module-body">
+                                    <h4 class="module-title"><?= e($section['title']) ?></h4>
+                                    <ul class="chip-list">
+                                        <?php foreach ($section['lessons'] as $lesson): ?>
+                                            <li class="chip<?= $lesson['type'] === 'quiz' ? ' chip-quiz' : '' ?>"><?= icon(Course::lessonIcon($lesson)) ?><?= e($t->lessonLabel($lesson)) ?></li>
+                                        <?php endforeach; ?>
+                                    </ul>
+                                </div>
+                            </li>
+                        <?php endforeach; ?>
+                    </ol>
+                </div>
+            <?php endforeach; ?>
         </div>
     </section>
 </main>

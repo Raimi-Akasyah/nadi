@@ -10,12 +10,11 @@ function now_str(): string
 function learner_create(array $clean, string $tokenHash): int
 {
     $stmt = db()->prepare(
-        'INSERT INTO learners (first_name, last_name, age, email, phone, address, occupation, token_hash, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO learners (full_name, age, email, phone, address, occupation, token_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([
-        $clean['first_name'],
-        $clean['last_name'],
+        $clean['full_name'],
         (int)$clean['age'],
         $clean['email'],
         $clean['phone'],
@@ -66,17 +65,44 @@ function learner_token_add(int $learnerId, string $tokenHash): void
  */
 function learner_find_for_resume(string $email): ?array
 {
+    return learner_best_match('LOWER(l.email) = LOWER(?)', trim($email));
+}
+
+/**
+ * "Sambung Semula" with a full name (case-insensitive, spaces collapsed by normalize_name()).
+ * Two different people can share a name, so when the name belongs to learners with more than one e-mail address,
+ * nobody is resumed ('ambiguous' => true) and the learner is asked for their e-mail instead. Learners with one
+ * e-mail but several records (earlier testing) are resolved like learner_find_for_resume().
+ *
+ * @return array{learner: ?array, ambiguous: bool}
+ */
+function learner_find_for_resume_by_name(string $fullName): array
+{
+    $stmt = db()->prepare('SELECT COUNT(DISTINCT LOWER(TRIM(email))) FROM learners WHERE full_name = ?');
+    $stmt->execute([$fullName]);
+    if ((int)$stmt->fetchColumn() > 1) {
+        return ['learner' => null, 'ambiguous' => true];
+    }
+    return ['learner' => learner_best_match('l.full_name = ?', $fullName), 'ambiguous' => false];
+}
+
+/**
+ * The learner matching $where (one placeholder) with the most progress: a course completion first, then a passed
+ * quiz, then the most completed lessons, then the newest record.
+ */
+function learner_best_match(string $where, string $value): ?array
+{
     $stmt = db()->prepare(
         'SELECT l.*,
                 (SELECT COUNT(*) FROM completions c WHERE c.learner_id = l.id) AS resume_completions,
                 (SELECT COUNT(DISTINCT a.quiz_key) FROM quiz_attempts a WHERE a.learner_id = l.id AND a.passed = 1) AS resume_passes,
                 (SELECT COUNT(*) FROM lesson_progress p WHERE p.learner_id = l.id) AS resume_lessons
          FROM learners l
-         WHERE LOWER(l.email) = LOWER(?)
+         WHERE ' . $where . '
          ORDER BY resume_completions DESC, resume_passes DESC, resume_lessons DESC, l.id DESC
          LIMIT 1'
     );
-    $stmt->execute([trim($email)]);
+    $stmt->execute([$value]);
     $row = $stmt->fetch();
     if ($row === false) {
         return null;
@@ -225,7 +251,7 @@ function completion_create(int $learnerId, string $courseKey, int $attemptId): a
 function completion_find_by_code(string $code): ?array
 {
     $stmt = db()->prepare(
-        'SELECT c.*, l.first_name, l.last_name
+        'SELECT c.*, l.full_name, l.first_name, l.last_name
          FROM completions c JOIN learners l ON l.id = c.learner_id
          WHERE c.certificate_code = ?'
     );

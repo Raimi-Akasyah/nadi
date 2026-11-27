@@ -10,7 +10,7 @@ require_once __DIR__ . '/icons.php';
         <p class="auth-brand-title">Belajar AI, langkah demi langkah</p>
         <ul class="auth-points">
             <li><span class="auth-point-icon"><?= icon('gift') ?></span><span><strong>Percuma</strong> Semua modul, kuiz dan sijil.</span></li>
-            <li><span class="auth-point-icon"><?= icon('mail') ?></span><span><strong>Tiada kata laluan</strong> Sambung semula dengan e-mel anda sahaja.</span></li>
+            <li><span class="auth-point-icon"><?= icon('mail') ?></span><span><strong>Tiada kata laluan</strong> Sambung semula dengan nama penuh atau e-mel anda.</span></li>
             <li><span class="auth-point-icon"><?= icon('award') ?></span><span><strong>Sijil digital</strong> Muat turun PDF selepas lulus kesemua kuiz.</span></li>
         </ul>
         <img class="auth-mascot" src="assets/img/mascot-wave-320.webp" alt="" width="320" height="294">
